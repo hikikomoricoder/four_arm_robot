@@ -52,10 +52,6 @@
     <xacro:property name="arm_base_width" value="0.1" />
     <xacro:property name="arm_base_height" value="0.03" />
 
-    <xacro:property name="arm_base_length" value="0.1" />
-    <xacro:property name="arm_base_width" value="0.1" />
-    <xacro:property name="arm_base_height" value="0.03" />
-
     <xacro:property name="veer_length" value="0.04" />
     <xacro:property name="veer_width" value="0.04" />
     <xacro:property name="veer_height" value="0.01" />

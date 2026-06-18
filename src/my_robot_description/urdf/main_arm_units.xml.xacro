@@ -169,14 +169,14 @@
                 <origin xyz="0 0 ${arm_joint_2_radius/2+arm_link_1_height/2+arm_joint_1_length/2}" rpy="0 0 0" />
                 <material name="link_common_color" />
             </visual>
-            <!-- <collision>
+            <collision>
                 <geometry>
-                    <box size="${arm_link_3_length} ${arm_link_3_width} ${arm_link_3_height}" />
+                    <box size="${0.01} ${0.01} ${arm_joint_2_radius+arm_link_1_height+arm_joint_1_length}" />
                 </geometry>
-                <origin xyz="0 0 ${arm_link_3_height/2+arm_joint_3_radius}" rpy="0 0 0" />
+                <origin xyz="0 0 ${arm_joint_2_radius/2+arm_link_1_height/2+arm_joint_1_length/2}" rpy="0 0 0" />
             </collision>
-            <xacro:box_inertia m="1.0" x="${arm_link_3_length}" y="${arm_link_3_width}" z="${arm_link_3_height}"
-                            o_xyz="0 0 ${arm_link_3_height/2+arm_joint_3_radius}" o_rpy="0 0 0" /> -->
+            <xacro:box_inertia m="0.1" x="0.01" y="0.01" z="${arm_joint_2_radius+arm_link_1_height+arm_joint_1_length}"
+                            o_xyz="0 0 ${arm_joint_2_radius/2+arm_link_1_height/2+arm_joint_1_length/2}" o_rpy="0 0 0" />
         </link>
     </xacro:macro>
 
