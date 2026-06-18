@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdf version="1.7">
+  <model name="calibration_checkerboard">
+    <static>true</static>
+    <link name="board">
+      <pose>0 0 0 0 0 0</pose>
+      <visual name="board_white">
+        <geometry>
+          <box>
+            <size>0.254 0.005 0.179</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>1 1 1 1</ambient>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0 0 0 1</specular>
+        </material>
+      </visual>
+      <visual name="black_square_r0_c1"><pose>-0.0875 0 0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r0_c3"><pose>-0.0375 0 0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r0_c5"><pose>0.0125 0 0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r0_c7"><pose>0.0625 0 0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r0_c9"><pose>0.1125 0 0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r1_c0"><pose>-0.1125 0 0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r1_c2"><pose>-0.0625 0 0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r1_c4"><pose>-0.0125 0 0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r1_c6"><pose>0.0375 0 0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r1_c8"><pose>0.0875 0 0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r2_c1"><pose>-0.0875 0 0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r2_c3"><pose>-0.0375 0 0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r2_c5"><pose>0.0125 0 0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r2_c7"><pose>0.0625 0 0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r2_c9"><pose>0.1125 0 0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r3_c0"><pose>-0.1125 0 0 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r3_c2"><pose>-0.0625 0 0 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r3_c4"><pose>-0.0125 0 0 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r3_c6"><pose>0.0375 0 0 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r3_c8"><pose>0.0875 0 0 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r4_c1"><pose>-0.0875 0 -0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r4_c3"><pose>-0.0375 0 -0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r4_c5"><pose>0.0125 0 -0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r4_c7"><pose>0.0625 0 -0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r4_c9"><pose>0.1125 0 -0.025 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r5_c0"><pose>-0.1125 0 -0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r5_c2"><pose>-0.0625 0 -0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r5_c4"><pose>-0.0125 0 -0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r5_c6"><pose>0.0375 0 -0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r5_c8"><pose>0.0875 0 -0.05 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r6_c1"><pose>-0.0875 0 -0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r6_c3"><pose>-0.0375 0 -0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r6_c5"><pose>0.0125 0 -0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r6_c7"><pose>0.0625 0 -0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <visual name="black_square_r6_c9"><pose>0.1125 0 -0.075 0 0 0</pose><geometry><box><size>0.025 0.0054 0.025</size></box></geometry><material><ambient>0 0 0 1</ambient><diffuse>0 0 0 1</diffuse><specular>0 0 0 1</specular></material></visual>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.254 0.005 0.179</size>
+          </box>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass>0.2</mass>
+        <inertia>
+          <ixx>0.001</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.001</iyy>
+          <iyz>0</iyz>
+          <izz>0.001</izz>
+        </inertia>
+      </inertial>
+    </link>
+  </model>
+</sdf>

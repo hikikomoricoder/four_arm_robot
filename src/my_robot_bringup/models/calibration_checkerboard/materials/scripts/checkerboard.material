@@ -1,0 +1,14 @@
+material Checkerboard
+{
+  technique
+  {
+    pass
+    {
+      lighting off
+      texture_unit
+      {
+        texture checkerboard.png
+      }
+    }
+  }
+}
