@@ -66,12 +66,182 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        arm_base_link:
+        arm_base_link_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_link:
+        arm_base_link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_base_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_base_link_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_1_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_1_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_1_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_1_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_2_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_2_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_2_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_2_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_3_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_3_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_3_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_3_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_4_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_4_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_4_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_4_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_5_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_5_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_5_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_5_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_6_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_6_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_6_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_6_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_7_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_7_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_7_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_7_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_8_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_8_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_8_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_part_8_4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -80,45 +250,22 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        base_link:
+        battery_link_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        camera_link_1:
+        branch_arm_link_4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        camera_link_2:
+        branch_connecter_4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        camera_link_optical_1:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_link_optical_2:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        caster_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        elbow_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        forearm_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        gripper_base_link:
+        controller_link_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -133,36 +280,42 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        hand_link:
+        veer_link_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        left_wheel_link:
+        veer_link_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_wheel_link:
+        veer_link_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        second_link:
+        veer_link_4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        shoulder_link:
+        wheel_link_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tool_link:
+        wheel_link_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        wrist_link:
+          Value: true
+        wheel_link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wheel_link_4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -182,49 +335,107 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        arm_base_link:
+        arm_base_link_1:
           Value: true
-        arm_link:
+        arm_base_link_2:
+          Value: true
+        arm_base_link_3:
+          Value: true
+        arm_base_link_4:
+          Value: true
+        arm_part_1_1:
+          Value: true
+        arm_part_1_2:
+          Value: true
+        arm_part_1_3:
+          Value: true
+        arm_part_1_4:
+          Value: true
+        arm_part_2_1:
+          Value: true
+        arm_part_2_2:
+          Value: true
+        arm_part_2_3:
+          Value: true
+        arm_part_2_4:
+          Value: true
+        arm_part_3_1:
+          Value: true
+        arm_part_3_2:
+          Value: true
+        arm_part_3_3:
+          Value: true
+        arm_part_3_4:
+          Value: true
+        arm_part_4_1:
+          Value: true
+        arm_part_4_2:
+          Value: true
+        arm_part_4_3:
+          Value: true
+        arm_part_4_4:
+          Value: true
+        arm_part_5_1:
+          Value: true
+        arm_part_5_2:
+          Value: true
+        arm_part_5_3:
+          Value: true
+        arm_part_5_4:
+          Value: true
+        arm_part_6_1:
+          Value: true
+        arm_part_6_2:
+          Value: true
+        arm_part_6_3:
+          Value: true
+        arm_part_6_4:
+          Value: true
+        arm_part_7_1:
+          Value: true
+        arm_part_7_2:
+          Value: true
+        arm_part_7_3:
+          Value: true
+        arm_part_7_4:
+          Value: true
+        arm_part_8_1:
+          Value: true
+        arm_part_8_2:
+          Value: true
+        arm_part_8_3:
+          Value: true
+        arm_part_8_4:
           Value: true
         base_footprint:
           Value: true
-        base_link:
+        battery_link_1:
           Value: true
-        camera_link_1:
+        branch_arm_link_4:
           Value: true
-        camera_link_2:
+        branch_connecter_4:
           Value: true
-        camera_link_optical_1:
-          Value: true
-        camera_link_optical_2:
-          Value: true
-        caster_wheel_link:
-          Value: true
-        elbow_link:
-          Value: true
-        forearm_link:
-          Value: true
-        gripper_base_link:
+        controller_link_1:
           Value: true
         gripper_left_finger_link:
           Value: true
         gripper_right_finger_link:
           Value: true
-        hand_link:
+        veer_link_1:
           Value: true
-        left_wheel_link:
+        veer_link_2:
           Value: true
-        odom:
+        veer_link_3:
           Value: true
-        right_wheel_link:
+        veer_link_4:
           Value: true
-        second_link:
+        wheel_link_1:
           Value: true
-        shoulder_link:
+        wheel_link_2:
           Value: true
-        tool_link:
+        wheel_link_3:
           Value: true
-        wrist_link:
+        wheel_link_4:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -233,35 +444,68 @@ Visualization Manager:
       Show Names: false
       Tree:
         base_footprint:
-          base_link:
-            camera_link_1:
-              camera_link_optical_1:
+          arm_base_link_1:
+            arm_part_1_1:
+              arm_part_2_1:
+                arm_part_3_1:
+                  arm_part_4_1:
+                    arm_part_5_1:
+                      arm_part_6_1:
+                        arm_part_7_1:
+                          arm_base_link_2:
+                            arm_part_1_2:
+                              arm_part_2_2:
+                                arm_part_3_2:
+                                  arm_part_4_2:
+                                    arm_part_5_2:
+                                      arm_part_6_2:
+                                        arm_part_7_2:
+                                          arm_base_link_3:
+                                            arm_part_1_3:
+                                              arm_part_2_3:
+                                                arm_part_3_3:
+                                                  arm_part_4_3:
+                                                    arm_part_5_3:
+                                                      arm_part_6_3:
+                                                        arm_part_7_3:
+                                                          arm_base_link_4:
+                                                            arm_part_1_4:
+                                                              arm_part_2_4:
+                                                                arm_part_3_4:
+                                                                  arm_part_4_4:
+                                                                    arm_part_5_4:
+                                                                      arm_part_6_4:
+                                                                        arm_part_7_4:
+                                                                          arm_part_8_4:
+                                                                            {}
+                                                                        branch_arm_link_4:
+                                                                          branch_connecter_4:
+                                                                            gripper_left_finger_link:
+                                                                              {}
+                                                                            gripper_right_finger_link:
+                                                                              {}
+                                                            veer_link_4:
+                                                              wheel_link_4:
+                                                                {}
+                                                          arm_part_8_3:
+                                                            {}
+                                            veer_link_3:
+                                              wheel_link_3:
+                                                {}
+                                          arm_part_8_2:
+                                            {}
+                            veer_link_2:
+                              wheel_link_2:
+                                {}
+                          arm_part_8_1:
+                            {}
+                    battery_link_1:
+                      {}
+                    controller_link_1:
+                      {}
+            veer_link_1:
+              wheel_link_1:
                 {}
-            camera_link_2:
-              camera_link_optical_2:
-                {}
-            caster_wheel_link:
-              {}
-            left_wheel_link:
-              {}
-            right_wheel_link:
-              {}
-            second_link:
-              arm_base_link:
-                shoulder_link:
-                  arm_link:
-                    elbow_link:
-                      forearm_link:
-                        wrist_link:
-                          hand_link:
-                            tool_link:
-                              gripper_base_link:
-                                gripper_left_finger_link:
-                                  {}
-                                gripper_right_finger_link:
-                                  {}
-        odom:
-          {}
       Update Interval: 0
       Value: true
   Enabled: true
