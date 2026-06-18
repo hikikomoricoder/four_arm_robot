@@ -1,0 +1,115 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:macro name="branch_arm_link" params="prefix">
+        <link name="branch_arm_link_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${branch_arm_link_length} ${branch_arm_link_width} ${branch_arm_link_height}" />
+                </geometry>
+                <origin xyz="0 0 ${branch_arm_link_height/2}" rpy="0 0 0" />
+                <material name="branch_link_color" />
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${branch_arm_link_length} ${branch_arm_link_width} ${branch_arm_link_height}" />
+                </geometry>
+                <origin xyz="0 0 ${branch_arm_link_height/2}" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="0.5" x="${branch_arm_link_length}" y="${branch_arm_link_width}" z="${branch_arm_link_height}"
+                            o_xyz="0 0 ${branch_arm_link_height/2}" o_rpy="0 0 0" />
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="branch_connecter" params="prefix">
+        <link name="branch_connecter_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${connecter_link_length} ${connecter_link_width} ${connecter_link_height}" />
+                </geometry>
+                <origin xyz="0 0 ${connecter_link_height/2}" rpy="0 0 0" />
+                <material name="branch_link_color" />
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${connecter_link_length} ${connecter_link_width} ${connecter_link_height}" />
+                </geometry>
+                <origin xyz="0 0 ${connecter_link_height/2}" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="0.5" x="${connecter_link_length}" y="${connecter_link_width}" z="${connecter_link_height}"
+                            o_xyz="0 0 ${connecter_link_height/2}" o_rpy="0 0 0" />
+        </link>
+    </xacro:macro>
+
+    <xacro:branch_arm_link prefix="4" />
+    <xacro:branch_connecter prefix="4" />
+
+    <xacro:macro name="branch_connect_joint" params="prefix">
+        <joint name="branch_connect_joint_${prefix}" type="fixed">
+            <parent link="branch_arm_link_${prefix}" />
+            <child link="branch_connecter_${prefix}" />
+            <origin xyz="0 0 ${branch_arm_link_height+connecter_link_height/2}" rpy="0 0 0" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:branch_connect_joint prefix="4" />
+
+    <link name="gripper_left_finger_link">
+        <inertial>
+            <origin rpy="0 0 0" xyz="0 0 ${gripper_link_height/2}"/>
+            <mass value="0.05"/>
+            <inertia ixx="4.167e-05" ixy="0.0" ixz="0.0" iyy="2.833e-05" iyz="0.0" izz="1.667e-05"/>
+        </inertial>
+        <visual>
+            <geometry>
+                <box size="${gripper_link_length} ${gripper_link_width} ${gripper_link_height}"/>
+            </geometry>
+            <origin rpy="0 0 0" xyz="0 0 ${gripper_link_height/2}"/>
+            <material name="gripper_color"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="${gripper_link_length} ${gripper_link_width} ${gripper_link_height}"/>
+            </geometry>
+            <origin rpy="0 0 0" xyz="0 0 ${gripper_link_height/2}"/>
+        </collision>
+    </link>
+
+    <link name="gripper_right_finger_link">
+        <inertial>
+            <origin rpy="0 0 0" xyz="0 0 ${gripper_link_height/2}"/>
+            <mass value="0.05"/>
+            <inertia ixx="4.167e-05" ixy="0.0" ixz="0.0" iyy="2.833e-05" iyz="0.0" izz="1.667e-05"/>
+        </inertial>
+        <visual>
+            <geometry>
+                <box size="${gripper_link_length} ${gripper_link_width} ${gripper_link_height}"/>
+            </geometry>
+            <origin rpy="0 0 0" xyz="0 0 ${gripper_link_height/2}"/>
+            <material name="gripper_color"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="${gripper_link_length} ${gripper_link_width} ${gripper_link_height}"/>
+            </geometry>
+            <origin rpy="0 0 0" xyz="0 0 ${gripper_link_height/2}"/>
+        </collision>
+    </link>
+
+    <joint name="gripper_left_finger_joint" type="prismatic">
+        <parent link="branch_connecter_4"/>
+        <child link="gripper_left_finger_link"/>
+        <origin rpy="0 0 0" xyz="-${connecter_link_length/2} 0 ${connecter_link_height/2}"/>
+        <axis xyz="1 0 0"/>
+        <limit lower="0.0" upper="0.06" effort="1000.0" velocity="1.0"/>
+    </joint>
+
+    <joint name="gripper_right_finger_joint" type="prismatic">
+        <parent link="branch_connecter_4"/>
+        <child link="gripper_right_finger_link"/>
+        <origin rpy="0 0 0" xyz="${connecter_link_length/2} 0 ${connecter_link_height/2}"/>
+        <axis xyz="1 0 0"/>
+        <mimic joint="gripper_left_finger_joint" multiplier="-1.0"/>
+        <limit lower="-0.06" upper="0.00" effort="1000.0" velocity="1.0"/>
+    </joint>
+</robot>

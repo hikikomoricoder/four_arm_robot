@@ -1,0 +1,408 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:macro name="arm_base_link" params="prefix">
+        <link name="arm_base_link_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${arm_base_length} ${arm_base_width} ${arm_base_height}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <material name="base_link_color" />
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${arm_base_length} ${arm_base_width} ${arm_base_height}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="0.5" x="${arm_base_length}" y="${arm_base_width}" z="${arm_base_height}"
+                            o_xyz="0 0 0" o_rpy="0 0 0" />
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="arm_part_1" params="prefix">
+        <link name="arm_part_1_${prefix}">
+            <visual>
+                <geometry>
+                    <cylinder radius="${arm_joint_1_radius}" length="${arm_joint_1_length}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_joint_1_length/2}" rpy="0 0 0" />
+                <material name="joint_group_color_${prefix}" />
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder radius="${arm_joint_1_radius}" length="${arm_joint_1_length}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_joint_1_length/2}" rpy="0 0 0" />
+            </collision>
+            <xacro:cylinder_inertia m="2.0" r="${arm_joint_1_radius}" l="${arm_joint_1_length}"
+                                o_xyz="0 0 ${arm_joint_1_length/2}" o_rpy="0 0 0"/>
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="arm_part_2" params="prefix">
+        <link name="arm_part_2_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${arm_link_1_length} ${arm_link_1_width} ${arm_link_1_height}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_link_1_height/2}" rpy="0 0 0" />
+                <material name="link_common_color" />
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${arm_link_1_length} ${arm_link_1_width} ${arm_link_1_height}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_link_1_height/2}" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="0.5" x="${arm_link_1_length}" y="${arm_link_1_width}" z="${arm_link_1_height}"
+                            o_xyz="0 0 ${arm_link_1_height/2}" o_rpy="0 0 0" />
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="arm_part_3" params="prefix">
+        <link name="arm_part_3_${prefix}">
+            <visual>
+                <geometry>
+                    <cylinder radius="${arm_joint_2_radius}" length="${arm_joint_2_length}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
+                <material name="joint_group_color_${prefix}" />
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder radius="${arm_joint_2_radius}" length="${arm_joint_2_length}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
+            </collision>
+            <xacro:cylinder_inertia m="2.0" r="${arm_joint_2_radius}" l="${arm_joint_2_length}"
+                                o_xyz="0 0 0" o_rpy="${pi / 2.0} 0 0"/>
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="arm_part_4" params="prefix">
+        <link name="arm_part_4_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${arm_link_2_length} ${arm_link_2_width} ${arm_link_2_height}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_link_2_height/2+arm_joint_2_radius}" rpy="0 0 0" />
+                <material name="link_common_color" />
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${arm_link_2_length} ${arm_link_2_width} ${arm_link_2_height}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_link_2_height/2+arm_joint_2_radius}" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="1.0" x="${arm_link_2_length}" y="${arm_link_2_width}" z="${arm_link_2_height}"
+                            o_xyz="0 0 ${arm_link_2_height/2+arm_joint_2_radius}" o_rpy="0 0 0" />
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="arm_part_5" params="prefix">
+        <link name="arm_part_5_${prefix}">
+            <visual>
+                <geometry>
+                    <cylinder radius="${arm_joint_3_radius}" length="${arm_joint_3_length}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
+                <material name="joint_group_color_${prefix}" />
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder radius="${arm_joint_3_radius}" length="${arm_joint_3_length}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
+            </collision>
+            <xacro:cylinder_inertia m="2.0" r="${arm_joint_3_radius}" l="${arm_joint_3_length}"
+                                o_xyz="0 0 0" o_rpy="${pi / 2.0} 0 0"/>
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="arm_part_6" params="prefix">
+        <link name="arm_part_6_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${arm_link_3_length} ${arm_link_3_width} ${arm_link_3_height}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_link_3_height/2+arm_joint_3_radius}" rpy="0 0 0" />
+                <material name="link_common_color" />
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${arm_link_3_length} ${arm_link_3_width} ${arm_link_3_height}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_link_3_height/2+arm_joint_3_radius}" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="1.0" x="${arm_link_3_length}" y="${arm_link_3_width}" z="${arm_link_3_height}"
+                            o_xyz="0 0 ${arm_link_3_height/2+arm_joint_3_radius}" o_rpy="0 0 0" />
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="arm_part_7" params="prefix">
+        <link name="arm_part_7_${prefix}">
+            <visual>
+                <geometry>
+                    <cylinder radius="${arm_joint_4_radius}" length="${arm_joint_4_length}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
+                <material name="joint_group_color_${prefix}" />
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder radius="${arm_joint_4_radius}" length="${arm_joint_4_length}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
+            </collision>
+            <xacro:cylinder_inertia m="2.0" r="${arm_joint_4_radius}" l="${arm_joint_4_length}"
+                                o_xyz="0 0 0" o_rpy="${pi / 4.0} 0 0"/>
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="arm_part_8" params="prefix">
+        <link name="arm_part_8_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${0.01} ${0.01} ${arm_joint_2_radius+arm_link_1_height+arm_joint_1_length}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_joint_2_radius/2+arm_link_1_height/2+arm_joint_1_length/2}" rpy="0 0 0" />
+                <material name="link_common_color" />
+            </visual>
+            <!-- <collision>
+                <geometry>
+                    <box size="${arm_link_3_length} ${arm_link_3_width} ${arm_link_3_height}" />
+                </geometry>
+                <origin xyz="0 0 ${arm_link_3_height/2+arm_joint_3_radius}" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="1.0" x="${arm_link_3_length}" y="${arm_link_3_width}" z="${arm_link_3_height}"
+                            o_xyz="0 0 ${arm_link_3_height/2+arm_joint_3_radius}" o_rpy="0 0 0" /> -->
+        </link>
+    </xacro:macro>
+
+    <xacro:arm_base_link prefix="1" />
+    <xacro:arm_part_1 prefix="1" />
+    <xacro:arm_part_2 prefix="1" />
+    <xacro:arm_part_3 prefix="1" />
+    <xacro:arm_part_4 prefix="1" />
+    <xacro:arm_part_5 prefix="1" />
+    <xacro:arm_part_6 prefix="1" />
+    <xacro:arm_part_7 prefix="1" />
+    <xacro:arm_part_8 prefix="1" />
+
+    <xacro:arm_base_link prefix="2" />
+    <xacro:arm_part_1 prefix="2" />
+    <xacro:arm_part_2 prefix="2" />
+    <xacro:arm_part_3 prefix="2" />
+    <xacro:arm_part_4 prefix="2" />
+    <xacro:arm_part_5 prefix="2" />
+    <xacro:arm_part_6 prefix="2" />
+    <xacro:arm_part_7 prefix="2" />
+    <xacro:arm_part_8 prefix="2" />
+
+    <xacro:arm_base_link prefix="3" />
+    <xacro:arm_part_1 prefix="3" />
+    <xacro:arm_part_2 prefix="3" />
+    <xacro:arm_part_3 prefix="3" />
+    <xacro:arm_part_4 prefix="3" />
+    <xacro:arm_part_5 prefix="3" />
+    <xacro:arm_part_6 prefix="3" />
+    <xacro:arm_part_7 prefix="3" />
+    <xacro:arm_part_8 prefix="3" />
+
+    <xacro:arm_base_link prefix="4" />
+    <xacro:arm_part_1 prefix="4" />
+    <xacro:arm_part_2 prefix="4" />
+    <xacro:arm_part_3 prefix="4" />
+    <xacro:arm_part_4 prefix="4" />
+    <xacro:arm_part_5 prefix="4" />
+    <xacro:arm_part_6 prefix="4" />
+    <xacro:arm_part_7 prefix="4" />
+    <xacro:arm_part_8 prefix="4" />
+
+    <xacro:macro name="arm_joint_1" params="prefix">
+        <joint name="arm_joint_1_${prefix}" type="revolute">
+            <parent link="arm_base_link_${prefix}" />
+            <child link="arm_part_1_${prefix}" />
+            <origin xyz="0 0 ${arm_base_height/2}" rpy="0 0 ${pi / 2.0}" />
+            <axis xyz="0 0 1" />
+            <limit lower="-3.14" upper="3.14" effort="100" velocity="100" />
+            <dynamics friction="0.3" damping="0.3" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="arm_joint_2" params="prefix">
+        <joint name="arm_joint_2_${prefix}" type="fixed">
+            <parent link="arm_part_1_${prefix}" />
+            <child link="arm_part_2_${prefix}" />
+            <origin xyz="0 0 ${arm_joint_1_length}" rpy="0 0 0" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="arm_joint_3" params="prefix">
+        <joint name="arm_joint_3_${prefix}" type="revolute">
+            <parent link="arm_part_2_${prefix}" />
+            <child link="arm_part_3_${prefix}" />
+            <origin xyz="0 0 ${arm_link_1_height+arm_joint_2_radius}" rpy="0 -${pi / 4.0} 0" />
+            <axis xyz="0 1 0" />
+            <limit lower="-2.35" upper="2.35" effort="100" velocity="100" />
+            <dynamics friction="0.3" damping="0.3" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="arm_joint_4" params="prefix">
+        <joint name="arm_joint_4_${prefix}" type="fixed">
+            <parent link="arm_part_3_${prefix}" />
+            <child link="arm_part_4_${prefix}" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="arm_joint_5" params="prefix">
+        <joint name="arm_joint_5_${prefix}" type="revolute">
+            <parent link="arm_part_4_${prefix}" />
+            <child link="arm_part_5_${prefix}" />
+            <origin xyz="0 0 ${arm_link_2_height+arm_joint_2_radius+arm_joint_3_radius}" rpy="0 -${pi / 2.0} 0" />
+            <axis xyz="0 1 0" />
+            <limit lower="-2.35" upper="2.35" effort="100" velocity="100" />
+            <dynamics friction="0.3" damping="0.3" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="arm_joint_6" params="prefix">
+        <joint name="arm_joint_6_${prefix}" type="fixed">
+            <parent link="arm_part_5_${prefix}" />
+            <child link="arm_part_6_${prefix}" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="arm_joint_7" params="prefix">
+        <joint name="arm_joint_7_${prefix}" type="revolute">
+            <parent link="arm_part_6_${prefix}" />
+            <child link="arm_part_7_${prefix}" />
+            <origin xyz="0 0 ${arm_link_2_height+arm_joint_2_radius+arm_joint_1_radius}" rpy="0 -${pi / 4.0} 0" />
+            <axis xyz="0 1 0" />
+            <limit lower="-2.35" upper="2.35" effort="100" velocity="100" />
+            <dynamics friction="0.3" damping="0.3" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="arm_joint_8" params="prefix">
+        <joint name="arm_joint_8_${prefix}" type="fixed">
+            <parent link="arm_part_7_${prefix}" />
+            <child link="arm_part_8_${prefix}" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="group_joint" params="prefix">
+        <joint name="group_joint_${prefix}" type="fixed">
+            <parent link="arm_part_7_${prefix-1}" />
+            <child link="arm_base_link_${prefix}" />
+            <origin xyz="${arm_base_length/2} 0 ${arm_joint_2_radius+arm_link_1_height+arm_joint_1_length+arm_base_height/2}" rpy="0 ${pi} 0" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:arm_joint_1 prefix="1" />
+    <xacro:arm_joint_2 prefix="1" />
+    <xacro:arm_joint_3 prefix="1" />
+    <xacro:arm_joint_4 prefix="1" />
+    <xacro:arm_joint_5 prefix="1" />
+    <xacro:arm_joint_6 prefix="1" />
+    <xacro:arm_joint_7 prefix="1" />
+    <xacro:arm_joint_8 prefix="1" />
+
+    <xacro:group_joint prefix="2" />
+    <xacro:arm_joint_1 prefix="2" />
+    <xacro:arm_joint_2 prefix="2" />
+    <xacro:arm_joint_3 prefix="2" />
+    <xacro:arm_joint_4 prefix="2" />
+    <xacro:arm_joint_5 prefix="2" />
+    <xacro:arm_joint_6 prefix="2" />
+    <xacro:arm_joint_7 prefix="2" />
+    <xacro:arm_joint_8 prefix="2" />
+
+    <xacro:group_joint prefix="3" />
+    <xacro:arm_joint_1 prefix="3" />
+    <xacro:arm_joint_2 prefix="3" />
+    <xacro:arm_joint_3 prefix="3" />
+    <xacro:arm_joint_4 prefix="3" />
+    <xacro:arm_joint_5 prefix="3" />
+    <xacro:arm_joint_6 prefix="3" />
+    <xacro:arm_joint_7 prefix="3" />
+    <xacro:arm_joint_8 prefix="3" />
+
+    <xacro:group_joint prefix="4" />
+    <xacro:arm_joint_1 prefix="4" />
+    <xacro:arm_joint_2 prefix="4" />
+    <xacro:arm_joint_3 prefix="4" />
+    <xacro:arm_joint_4 prefix="4" />
+    <xacro:arm_joint_5 prefix="4" />
+    <xacro:arm_joint_6 prefix="4" />
+    <xacro:arm_joint_7 prefix="4" />
+    <xacro:arm_joint_8 prefix="4" />
+    
+    <xacro:macro name="battery_link" params="prefix">
+        <link name="battery_link_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${battery_length} ${battery_width} ${battery_height}" />
+                </geometry>
+                <origin xyz="0 0 ${battery_height/2+arm_joint_2_radius}" rpy="0 0 0" />
+                <material name="battery_color" />
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${battery_length} ${battery_width} ${battery_height}" />
+                </geometry>
+                <origin xyz="0 0 ${battery_height/2+arm_joint_2_radius}" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="2.0" x="${battery_length}" y="${battery_width}" z="${battery_height}"
+                            o_xyz="0 0 ${arm_link_2_height/2+arm_joint_2_radius}" o_rpy="0 0 0" />
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="controller_link" params="prefix">
+        <link name="controller_link_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${controller_length} ${controller_width} ${controller_height}" />
+                </geometry>
+                <origin xyz="0 0 ${controller_height/2+arm_joint_2_radius}" rpy="0 0 0" />
+                <material name="controller_color" />
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${controller_length} ${controller_width} ${controller_height}" />
+                </geometry>
+                <origin xyz="0 0 ${controller_height/2+arm_joint_2_radius}" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="1.0" x="${controller_length}" y="${controller_width}" z="${controller_height}"
+                            o_xyz="0 0 ${arm_link_2_height/2+arm_joint_2_radius}" o_rpy="0 0 0" />
+        </link>
+    </xacro:macro>
+
+    <xacro:battery_link prefix="1" />
+    <xacro:controller_link prefix="1" />
+
+    <xacro:macro name="battery_joint" params="prefix">
+        <joint name="battery_joint_${prefix}" type="fixed">
+            <parent link="arm_part_4_${prefix}" />
+            <child link="battery_link_${prefix}" />
+            <origin xyz="0 ${arm_link_2_width/2+battery_width/2} 0" rpy="0 0 0" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="controller_joint" params="prefix">
+        <joint name="controller_joint_${prefix}" type="fixed">
+            <parent link="arm_part_4_${prefix}" />
+            <child link="controller_link_${prefix}" />
+            <origin xyz="0 -${arm_link_2_width/2+controller_width/2} 0" rpy="0 0 0" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:battery_joint prefix="1" />
+    <xacro:controller_joint prefix="1" />
+
+</robot>

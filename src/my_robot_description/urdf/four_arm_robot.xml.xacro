@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<robot name="my_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:include filename="far_common_properties.xml.xacro" />
+    <xacro:include filename="main_arm_units.xml.xacro" />
+    <xacro:include filename="mobile_base_part.xml.xacro" />
+    <xacro:include filename="branch_arm_unit.xml.xacro" />
+
+    <link name="base_footprint" />
+
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint" />
+        <child link="arm_base_link_1" />
+        <origin xyz="0 0 ${wheel_radius*2+veer_height+arm_base_height/2}" rpy="0 0 0" />
+    </joint>
+
+    <xacro:macro name="group_joint" params="prefix">
+        <joint name="arm_veer_joint_${prefix}" type="revolute">
+            <parent link="arm_base_link_${prefix}" />
+            <child link="veer_link_${prefix}" />
+            <origin xyz="0 0 -${arm_base_height/2}" rpy="0 0 0" />
+            <axis xyz="0 0 1"/>
+            <limit lower="-0.8" upper="0.8" effort="10" velocity="1.0"/>
+        </joint>
+    </xacro:macro>
+
+    <xacro:group_joint prefix="1" />
+    <xacro:group_joint prefix="2" />
+    <xacro:group_joint prefix="3" />
+    <xacro:group_joint prefix="4" />
+
+    <xacro:macro name="branch_joint" params="prefix">
+        <joint name="branch_joint_${prefix}" type="fixed">
+            <parent link="arm_part_6_${prefix}" />
+            <child link="branch_arm_link_${prefix}" />
+            <origin xyz="0 ${arm_link_3_width/2+branch_arm_link_width/2} ${arm_link_3_height+arm_joint_3_radius}" rpy="0 0 0" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:branch_joint prefix="4" />
+
+</robot>
