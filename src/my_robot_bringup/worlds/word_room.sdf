@@ -1,0 +1,549 @@
+<sdf version='1.10'>
+  <world name='empty'>
+    <physics name='1ms' type='ignored'>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+    <plugin name='gz::sim::systems::Physics' filename='gz-sim-physics-system'/>
+    <plugin name='gz::sim::systems::UserCommands' filename='gz-sim-user-commands-system'/>
+    <plugin name='gz::sim::systems::SceneBroadcaster' filename='gz-sim-scene-broadcaster-system'/>
+    <plugin name='gz::sim::systems::Contact' filename='gz-sim-contact-system'/>
+    <gravity>0 0 -9.8000000000000007</gravity>
+    <magnetic_field>5.5644999999999998e-06 2.2875799999999999e-05 -4.2388400000000002e-05</magnetic_field>
+    <atmosphere type='adiabatic'/>
+    <scene>
+      <ambient>0.400000006 0.400000006 0.400000006 1</ambient>
+      <background>0.699999988 0.699999988 0.699999988 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <model name='ground_plane'>
+      <static>true</static>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+            <contact/>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.800000012 0.800000012 0.800000012 1</ambient>
+            <diffuse>0.800000012 0.800000012 0.800000012 1</diffuse>
+            <specular>0.800000012 0.800000012 0.800000012 1</specular>
+          </material>
+        </visual>
+        <pose>0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1</mass>
+          <inertia>
+            <ixx>1</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1</iyy>
+            <iyz>0</iyz>
+            <izz>1</izz>
+          </inertia>
+        </inertial>
+        <enable_wind>false</enable_wind>
+      </link>
+      <pose>0 0 0 0 0 0</pose>
+      <self_collide>false</self_collide>
+    </model>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/calibration_checkerboard</uri>
+      <name>calibration_checkerboard</name>
+      <pose>2.5243699550628662 -4.480140209197998 0.17037871479988098 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_stairs_120</uri>
+      <name>nist_stairs_120</name>
+      <pose>6.0745501518249512 3.096519947052002 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240</name>
+      <pose>8.6612158610904295 -8.0365256304874055 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_0</name>
+      <pose>7.5346495112148926 -8.0299048098087589 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_1</name>
+      <pose>6.3374330842680617 -8.0253177141431795 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_2</name>
+      <pose>5.1438709822489539 -8.0183604344426254 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_3</name>
+      <pose>3.9547032564460398 -8.0125963736317214 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_4</name>
+      <pose>2.7730085035347809 -8.0079457203946642 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_5</name>
+      <pose>1.5654200258056541 -8.0010830430488156 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_6</name>
+      <pose>0.36685144471719688 -7.9952318294168947 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_7</name>
+      <pose>-0.80667054273487615 -7.9787421445205844 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_8</name>
+      <pose>5.1110899857032681 3.2124653287702469 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_9</name>
+      <pose>3.9842758157284859 3.226310791964659 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_10</name>
+      <pose>2.798153210770689 3.2208642659495648 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_11</name>
+      <pose>1.6016291005475178 3.2164834833398661 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_12</name>
+      <pose>0.43216559473978577 3.2078685959498481 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_13</name>
+      <pose>-0.72176449549205568 3.2221884876237343 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_14</name>
+      <pose>-1.8979822560099429 3.2198694471204217 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_15</name>
+      <pose>-1.9749948520968461 -7.9745853817344985 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_16</name>
+      <pose>-3.1107231981295023 -7.9690717119223144 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17</name>
+      <pose>8.4667911529541016 -6.7557430267333984 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_1</name>
+      <pose>8.4981721466436575 -5.5548982724022231 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_2</name>
+      <pose>8.5402863383793139 -4.3610975445639202 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_3</name>
+      <pose>8.5402863015830945 -3.1592551402599769 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_4</name>
+      <pose>8.5402865780856878 -1.9776224672475216 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_5</name>
+      <pose>8.5402863657494095 -0.79577491574157988 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_6</name>
+      <pose>8.540286293829908 0.38542798885209395 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_7</name>
+      <pose>8.5402869941308914 1.5672753874757048 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_8</name>
+      <pose>8.5402870253807457 2.7491230187714262 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/drc_practice_valve_wall</uri>
+      <name>valve_wall</name>
+      <pose>7.8439817428588867 3.282520055770874 -5.6249902541123256e-07 -4.7071360481307268e-18 3.6998182295634846e-20 -3.7680290142924677e-21</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/drc_practice_valve_wall</uri>
+      <name>valve_wall_0</name>
+      <pose>6.6645495582147509 3.2986299988783019 -8.9211119607323506e-07 2.3140678906815023e-11 -7.2527803196833082e-07 2.322253231453154e-10</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_18</name>
+      <pose>-3.1236373191930475 3.2078628850082436 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_9</name>
+      <pose>-4.2700931839189309 -6.7463476591707661 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_10</name>
+      <pose>-4.2558402196007137 -5.5467684929303989 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_11</name>
+      <pose>-4.210923940645519 -4.3677971098510602 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_12</name>
+      <pose>-4.1801412785037257 -3.1759067846143028 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_13</name>
+      <pose>-4.1490986616207346 -1.9897295075614227 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_14</name>
+      <pose>-4.3146885077902777 3.2171686762937002 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_15</name>
+      <pose>-4.3458168466782929 2.0223442389229849 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_17_16</name>
+      <pose>-4.3748824338637329 0.82170883551516249 0 0 0 -1.5956999415955031</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_19</name>
+      <pose>-2.934131383895874 0.42176398634910583 -0.049819201231002808 1.5644999987405781 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_20</name>
+      <pose>-4.3415656089782715 -1.5806179046630859 0 0 0 -0.58894501142131694</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
+      <name>nist_maze_wall_240_21</name>
+      <pose>-3.8465061187744141 -0.58538901805877686 0 0 0 0.6261930310796997</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/standing person/3</uri>
+      <name>person_standing</name>
+      <pose>4.1393353375745292 1.9014801607491623 -9.4074227971821526e-11 -3.0045410603918303e-21 5.5843090072385808e-21 -2.6511808246328088e-21</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/walking person/3</uri>
+      <name>person_walking</name>
+      <pose>6.5840425682612178 1.1218762667633491 -1.0935889090818441e-10 3.5557969107208155e-22 4.404329769956506e-21 1.4326253396547672e-22</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/dining table/1</uri>
+      <name>DiningTable</name>
+      <pose>6.1987108037461862 -5.192025132359702 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/refrigerator/1</uri>
+      <name>Fridge</name>
+      <pose>-2.0882030178037079 -5.508595530198507 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/bed/1</uri>
+      <name>Bed</name>
+      <pose>1.8212555020876149 2.0703364048400323 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/office desk/1</uri>
+      <name>Desk</name>
+      <pose>-1.3151808977127075 2.4239692687988281 0 0 0 -1.5736500066127022</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/dining chair/1</uri>
+      <name>DiningChair</name>
+      <pose>5.9405492263755875 -3.3761478921888135 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/office chair/1</uri>
+      <name>OfficeChair</name>
+      <pose>-1.6488644371197294 1.3440022841182961 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120</name>
+      <pose>0.59128999710083008 -2.7525539398193359 -0.15706083178520203 1.577230014044404 -0.00011706598729938474 0.018196699589020461</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120_0</name>
+      <pose>0.6002119779586792 -1.6537145376205444 -0.41794025897979736 1.5231099841608389 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120_1</name>
+      <pose>0.6223679780960083 -3.8721098899841309 -0.27312099933624268 1.7694700266641268 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/dining chair/1</uri>
+      <name>DiningChair_0</name>
+      <pose>4.6602401733398438 -4.642399787902832 0 0 0 1.4962487700373786</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/yellow_box</uri>
+      <name>yellow_box</name>
+      <pose>3.4896492676301172 -4.6094875876088697 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/red_box</uri>
+      <name>red_box</name>
+      <pose>3.3330590581483337 -4.6036568470227888 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box</name>
+      <pose>3.1898384240762456 -4.5980058636150041 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_0</name>
+      <pose>5.8086872100830078 -3.3486299514770508 0.4489159882068634 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_1</name>
+      <pose>1.4438586151424295 0.31210075485218136 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_2</name>
+      <pose>1.4574314695929886 -1.3295798411900155 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_3</name>
+      <pose>1.941421763124243 0.33137359660111887 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_4</name>
+      <pose>1.9473546048986976 -1.3277872940881426 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/red_box</uri>
+      <name>red_box_0</name>
+      <pose>1.9594743143439031 -0.52036455289846939 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_5</name>
+      <pose>2.5316409288526645 0.35396794645017071 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_6</name>
+      <pose>2.5722143781996278 -1.336074560730427 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_7</name>
+      <pose>3.0659208267909039 -1.3448976511312096 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_8</name>
+      <pose>3.0556913911137245 0.3361271395768497 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/red_box</uri>
+      <name>red_box_1</name>
+      <pose>3.0659207127552897 -0.53197821306144921 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/yellow_box</uri>
+      <name>yellow_box_0</name>
+      <pose>4.3082493506059922 -0.55687996703858178 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_9</name>
+      <pose>3.6813140658032761 -1.3410502173964609 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_10</name>
+      <pose>3.6912458477206673 0.32411475677330592 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_11</name>
+      <pose>4.4121723254235992 0.3319386428661294 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_12</name>
+      <pose>4.3994200878690801 -1.3612088810004492 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_13</name>
+      <pose>4.938286034971024 0.18702451659976771 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_14</name>
+      <pose>4.9685634114002575 -1.5140844979319272 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_15</name>
+      <pose>5.5092654950163968 -0.0092977829723180916 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_16</name>
+      <pose>5.4742993650625928 -1.7516572565619364 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_17</name>
+      <pose>6.1160459518432617 -0.33476200699806213 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_18</name>
+      <pose>6.0466870772922299 -2.277645632464901 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_19</name>
+      <pose>6.3163121964037554 -2.8421423981675606 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_20</name>
+      <pose>6.7676200866699219 -0.96434980630874634 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_21</name>
+      <pose>7.2429099082946777 -1.6368105411529541 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_22</name>
+      <pose>7.5634765625 -2.3514599800109863 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_23</name>
+      <pose>7.791752815246582 -2.9363598823547363 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_24</name>
+      <pose>6.6469512933461932 -3.425527564994201 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_25</name>
+      <pose>6.9355472762892045 -4.0876398304826669 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_26</name>
+      <pose>8.0632651900967289 -3.5380647570233417 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_27</name>
+      <pose>8.2336101531982422 -4.1706910133361816 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_28</name>
+      <pose>8.2334148385158237 -4.7873242895429602 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/blue_box</uri>
+      <name>blue_box_29</name>
+      <pose>8.2569949891232604 -5.4007032317476673 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/four_arm_robot/src/my_robot_bringup/models/red_box</uri>
+      <name>red_box_2</name>
+      <pose>5.5680078123747441 -0.88558790319073244 0 0 0 0</pose>
+    </include>
+    <light name='sun' type='directional'>
+      <pose>0 0 10 0 0 0</pose>
+      <cast_shadows>true</cast_shadows>
+      <intensity>1</intensity>
+      <direction>-0.5 0.10000000000000001 -0.90000000000000002</direction>
+      <diffuse>0.800000012 0.800000012 0.800000012 1</diffuse>
+      <specular>0.200000003 0.200000003 0.200000003 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <linear>0.01</linear>
+        <constant>0.90000000000000002</constant>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
+    </light>
+  </world>
+</sdf>

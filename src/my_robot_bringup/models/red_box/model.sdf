@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdf version="1.7">
+  <model name="red_box">
+    <static>true</static>
+    <link name="box">
+      <pose>0 0 0.015 0 0 0</pose>
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>0.03 0.03 0.03</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.8 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <specular>0.3 0.3 0.3 1</specular>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.03 0.03 0.03</size>
+          </box>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass>0.02</mass>
+        <inertia>
+          <ixx>0.000003</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.000003</iyy>
+          <iyz>0</iyz>
+          <izz>0.000003</izz>
+        </inertia>
+      </inertial>
+    </link>
+  </model>
+</sdf>
