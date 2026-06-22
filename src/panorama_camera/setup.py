@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'display_four_camera = panorama_camera.display_four_camera:main',
         ],
     },
 )

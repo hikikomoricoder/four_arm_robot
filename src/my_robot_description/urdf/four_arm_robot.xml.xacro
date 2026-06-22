@@ -45,7 +45,7 @@
         <joint name="camera_joint_${prefix}" type="fixed">
             <parent link="arm_base_link_${prefix}" />
             <child link="camera_link_${prefix}" />
-            <origin xyz="-${arm_base_length/2-camera_length/2} ${arm_base_width/2-camera_width/2} ${arm_base_height/2+camera_height/2}" rpy="0 0 -${pi/4.0}" />
+            <origin xyz="-${arm_base_length/2-camera_length/2} ${arm_base_width/2-camera_width/2} ${arm_base_height/2+camera_height/2}" rpy="0 0 ${pi*3.0/4.0}" />
         </joint>
     </xacro:macro>
 
