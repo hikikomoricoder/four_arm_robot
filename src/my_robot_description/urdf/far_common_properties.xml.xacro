@@ -39,6 +39,9 @@
     <material name="controller_color">
         <color rgba="0.1 0.8 0.8 1" />
     </material>
+    <material name="camera_color">
+        <color rgba="0.1 0.1 0.1 1" />
+    </material>
 
     <xacro:property name="battery_length" value="0.08" />
     <xacro:property name="battery_width" value="0.04" />
@@ -102,6 +105,12 @@
     <xacro:property name="gripper_link_length" value="0.01" />
     <xacro:property name="gripper_link_width" value="0.04" />
     <xacro:property name="gripper_link_height" value="0.05" />
+    
+     <xacro:property name="camera_length" value="0.02" />
+     <xacro:property name="camera_width" value="0.02" />
+     <xacro:property name="camera_height" value="0.02" />
+     <xacro:property name="camera_mass" value="0.02" />
+     <xacro:property name="camera_optical_size" value="0.005" />
 
     <xacro:macro name="box_inertia" params="m x y z o_xyz o_rpy">
         <inertial>

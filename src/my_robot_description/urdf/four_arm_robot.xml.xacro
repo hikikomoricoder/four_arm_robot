@@ -5,6 +5,7 @@
     <xacro:include filename="main_arm_units.xml.xacro" />
     <xacro:include filename="mobile_base_part.xml.xacro" />
     <xacro:include filename="branch_arm_unit.xml.xacro" />
+    <xacro:include filename="unit_camera.xml.xacro" />
 
     <link name="base_footprint" />
 
@@ -39,5 +40,25 @@
     </xacro:macro>
 
     <xacro:branch_joint prefix="4" />
+
+    <xacro:macro name="camera_mount_joint" params="prefix">
+        <joint name="camera_joint_${prefix}" type="fixed">
+            <parent link="arm_base_link_${prefix}" />
+            <child link="camera_link_${prefix}" />
+            <origin xyz="-${arm_base_length/2-camera_length/2} ${arm_base_width/2-camera_width/2} ${arm_base_height/2+camera_height/2}" rpy="0 0 -${pi/4.0}" />
+        </joint>
+    </xacro:macro>
+
+    <xacro:camera_unit prefix="1" />
+    <xacro:camera_mount_joint prefix="1" />
+
+    <xacro:camera_unit prefix="2" />
+    <xacro:camera_mount_joint prefix="2" />
+
+    <xacro:camera_unit prefix="3" />
+    <xacro:camera_mount_joint prefix="3" />
+
+    <xacro:camera_unit prefix="4" />
+    <xacro:camera_mount_joint prefix="4" />
 
 </robot>
