@@ -28,4 +28,17 @@
         <param name="use_sim_time" value="true"/>
     </node>
 
+    <node pkg="ros_gz_bridge" exec="parameter_bridge" args="/camera_1/image_raw@sensor_msgs/msg/Image@gz.msgs.Image">
+        <param name="use_sim_time" value="true"/>
+    </node>
+    <node pkg="ros_gz_bridge" exec="parameter_bridge" args="/camera_2/image_raw@sensor_msgs/msg/Image@gz.msgs.Image">
+        <param name="use_sim_time" value="true"/>
+    </node>
+    <node pkg="ros_gz_bridge" exec="parameter_bridge" args="/camera_3/image_raw@sensor_msgs/msg/Image@gz.msgs.Image">
+        <param name="use_sim_time" value="true"/>
+    </node>
+    <node pkg="ros_gz_bridge" exec="parameter_bridge" args="/camera_4/image_raw@sensor_msgs/msg/Image@gz.msgs.Image">
+        <param name="use_sim_time" value="true"/>
+    </node>
+
 </launch>
