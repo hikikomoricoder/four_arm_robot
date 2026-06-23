@@ -6,6 +6,7 @@
     <xacro:include filename="mobile_base_part.xml.xacro" />
     <xacro:include filename="branch_arm_unit.xml.xacro" />
     <xacro:include filename="unit_camera.xml.xacro" />
+    <xacro:include filename="stereo_camera.xml.xacro" />
 
     <link name="base_footprint" />
 
@@ -35,7 +36,7 @@
         <joint name="branch_joint_${prefix}" type="fixed">
             <parent link="arm_part_6_${prefix}" />
             <child link="branch_arm_link_${prefix}" />
-            <origin xyz="0 ${arm_link_3_width/2+branch_arm_link_width/2} ${arm_link_3_height+arm_joint_3_radius}" rpy="0 0 0" />
+            <origin xyz="0 ${arm_link_3_width/2+branch_arm_link_width/2+0.05} ${arm_link_3_height+arm_joint_3_radius}" rpy="0 0 0" />
         </joint>
     </xacro:macro>
 

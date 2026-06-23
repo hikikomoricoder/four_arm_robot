@@ -1,0 +1,112 @@
+<?xml version="1.0"?>
+<robot  xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <link name="camera_link_5">
+        <visual>
+            <geometry>
+                <box size="${camera_length} ${camera_width} ${camera_height}" />
+            </geometry>
+            <material name="camera_color" />
+        </visual>
+        <collision>
+            <geometry>
+                <box size="${camera_length} ${camera_width} ${camera_height}" />
+            </geometry>
+        </collision>
+        <xacro:box_inertia m="0.1" x="${camera_length}" y="${camera_width}" z="${camera_height}"
+                            o_xyz="0 0 0" o_rpy="0 0 0" />
+    </link>
+    <link name="camera_link_6">
+        <visual>
+            <geometry>
+                <box size="${camera_length} ${camera_width} ${camera_height}" />
+            </geometry>
+            <material name="camera_color" />
+        </visual>
+        <collision>
+            <geometry>
+                <box size="${camera_length} ${camera_width} ${camera_height}" />
+            </geometry>
+        </collision>
+        <xacro:box_inertia m="0.1" x="${camera_length}" y="${camera_width}" z="${camera_height}"
+                            o_xyz="0 0 0" o_rpy="0 0 0" />
+    </link>
+
+    <joint name="base_camera_joint_5" type="fixed">
+        <parent link="branch_arm_link_4" />
+        <child link="camera_link_5" />
+        <origin xyz="${(branch_arm_link_length)/2.0} ${branch_arm_link_width*2} ${branch_arm_link_height/2.0}" rpy="-${pi/2.0} 0 0" />
+    </joint>
+    <joint name="base_camera_joint_6" type="fixed">
+        <parent link="branch_arm_link_4" />
+        <child link="camera_link_6" />
+        <origin xyz="${(branch_arm_link_length)/2.0} ${-branch_arm_link_width*2} ${branch_arm_link_height/2.0}" rpy="-${pi/2.0} 0 0" />
+    </joint>
+
+    <link name="camera_link_optical_5" />
+    <joint name="camera_optical_joint_5" type="fixed">
+        <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}" />
+        <parent link="camera_link_5" />
+        <child link="camera_link_optical_5" />
+    </joint>
+    <link name="camera_link_optical_6" />
+    <joint name="camera_optical_joint_6" type="fixed">
+        <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}" />
+        <parent link="camera_link_6" />
+        <child link="camera_link_optical_6" />
+    </joint>
+
+    <gazebo reference="camera_link_5">
+        <sensor name="camera_5" type="camera">
+            <camera>
+                <horizontal_fov>1.3962634</horizontal_fov>
+                <image>
+                    <width>640</width>
+                    <height>480</height>
+                    <format>R8G8B8</format>
+                </image>
+                <clip>
+                    <near>0.1</near>
+                    <far>15</far>
+                </clip>
+                <noise>
+                    <type>gaussian</type>
+                    <mean>0.0</mean>
+                    <stddev>0.007</stddev>
+                </noise>
+                <optical_frame_id>camera_link_optical_5</optical_frame_id>
+                <camera_info_topic>camera_5/camera_info</camera_info_topic>
+            </camera>
+            <always_on>1</always_on>
+            <update_rate>20</update_rate>
+            <visualize>true</visualize>
+            <topic>camera_5/image_raw</topic>
+        </sensor>
+    </gazebo>
+    <gazebo reference="camera_link_6">
+        <sensor name="camera_6" type="camera">
+            <camera>
+                <horizontal_fov>1.3962634</horizontal_fov>
+                <image>
+                    <width>640</width>
+                    <height>480</height>
+                    <format>R8G8B8</format>
+                </image>
+                <clip>
+                    <near>0.1</near>
+                    <far>15</far>
+                </clip>
+                <noise>
+                    <type>gaussian</type>
+                    <mean>0.0</mean>
+                    <stddev>0.007</stddev>
+                </noise>
+                <optical_frame_id>camera_link_optical_6</optical_frame_id>
+                <camera_info_topic>camera_6/camera_info</camera_info_topic>
+            </camera>
+            <always_on>1</always_on>
+            <update_rate>20</update_rate>
+            <visualize>true</visualize>
+            <topic>camera_6/image_raw</topic>
+        </sensor>
+    </gazebo>
+</robot>

@@ -41,6 +41,26 @@
         </link>
     </xacro:macro>
 
+    <xacro:macro name="camera_connecter" params="prefix">
+        <link name="camera_connecter_${prefix}">
+            <visual>
+                <geometry>
+                    <box size="${connecter_link_length} ${connecter_link_width} ${connecter_link_height}" />
+                </geometry>
+                <origin xyz="0 0 ${connecter_link_height/2}" rpy="0 0 0" />
+                <material name="branch_link_color" />
+            </visual>
+            <collision>
+                <geometry>
+                    <box size="${connecter_link_length} ${connecter_link_width} ${connecter_link_height}" />
+                </geometry>
+                <origin xyz="0 0 ${connecter_link_height/2}" rpy="0 0 0" />
+            </collision>
+            <xacro:box_inertia m="0.5" x="${connecter_link_length}" y="${connecter_link_width}" z="${connecter_link_height}"
+                            o_xyz="0 0 ${connecter_link_height/2}" o_rpy="0 0 0" />
+        </link>
+    </xacro:macro>
+
     <xacro:branch_arm_link prefix="4" />
     <xacro:branch_connecter prefix="4" />
 
