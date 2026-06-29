@@ -58,7 +58,7 @@
                     <camera_info_topic>camera_${prefix}/camera_info</camera_info_topic>
                 </camera>
                 <always_on>1</always_on>
-                <update_rate>20</update_rate>
+                <update_rate>1</update_rate>
                 <visualize>true</visualize>
                 <topic>camera_${prefix}/image_raw</topic>
             </sensor>
