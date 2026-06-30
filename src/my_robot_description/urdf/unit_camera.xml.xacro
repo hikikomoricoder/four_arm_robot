@@ -46,7 +46,7 @@
                         <format>R8G8B8</format>
                     </image>
                     <clip>
-                        <near>0.3</near>
+                        <near>0.1</near>
                         <far>16.0</far>
                     </clip>
                     <noise>

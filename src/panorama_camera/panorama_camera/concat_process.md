@@ -45,6 +45,13 @@
 | `fast_threshold` | 20 | ORB FAST 角点检测阈值（越小越敏感，OpenCV 默认 20） |
 | `grid_rows` | 6 | 网格化均匀分配的行数（≤1 则禁用网格，使用全图检测结果） |
 | `grid_cols` | 6 | 网格化均匀分配的列数（≤1 则禁用网格，使用全图检测结果） |
+| `_max_pair_scale` | 2.0 | 相邻单应性线性部分允许的最大缩放 |
+| `_min_pair_scale` | 0.5 | 相邻单应性线性部分允许的最小缩放 |
+| `_max_pair_perspective` | 0.1 | 透视项上限，防止消失点过近导致画布爆炸 |
+| `_max_pair_width_ratio` | 1.5 | 单张图变换后宽度相对原始宽度的上限 |
+| `_max_pair_height_ratio` | 1.2 | 单张图变换后高度相对原始高度的上限 |
+| `_max_canvas_width_ratio` | 4.0 | 最终全景图宽度相对单张图宽度的上限 |
+| `_max_canvas_height_ratio` | 1.5 | 最终全景图高度相对单张图高度的上限 |
 
 ### 调试开关
 | 变量 | 默认值 | 说明 |
@@ -90,6 +97,10 @@ compute_stitch(images)
   ├─ Step D: 平移变换 T（使画布原点为 (0,0)）
   │     T 将 min_xy 平移到原点
   │     _warp_homographies[i] = T @ cumulative[i]
+  ├─ Step E: 画布大小硬上限保护
+  │     若 canvas_w > `_max_canvas_width_ratio` × 单图宽
+  │        或 canvas_h > `_max_canvas_height_ratio` × 单图高
+  │     则对所有 `_warp_homographies` 做统一缩放，使输出满足上限
   ├─ 保存状态: _ready=True, _recompute=False
   └─ 返回 True
 ```
@@ -172,13 +183,22 @@ right_crop = right_img[:, w - crop_w:] # 右图右侧 40%
 #### Step 4: 单应性矩阵估计
 
 ```
-cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh)
+H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh)
 ```
 
 - `src_pts`：右图关键点 → 源点
 - `dst_pts`：左图关键点 → 目标点
 - 使用 RANSAC 剔除离群点
 - 若 H 为 None 或内点数 `< min_matches`，返回失败
+- 成功后调用 `_pair_homography_is_reasonable(H, w, h)` 进行几何合理性检查：
+  - 线性部分缩放需在 `[0.5, 2.0]`
+  - 透视项需足够小（`_max_pair_perspective`）
+  - 变换后图像宽度不超过原图的 `1.5` 倍，高度不超过 `1.2` 倍
+- 若检查不通过，使用同一组匹配点拟合纯平移单应性矩阵 `_estimate_translation_homography`：
+  - 以中位数位移作为 `tx, ty`
+  - 按 `ransac_thresh` 统计内点
+  - 内点数不足时返回失败
+- 策略标记会追加 `+translation`，调试窗口只绘制最终内点
 
 #### Step 5: 调试可视化（仅当 `debug_match=True` 且 `pair_idx == debug_pair`）
 
@@ -208,6 +228,7 @@ panorama = accumulator / weights                           # 归一化
 - 越靠近图像边缘权重越低，实现平滑过渡
 - maskSize=5 意味着使用更精确的 L2 距离近似
 - 最后 clip 到 [0, 255] 并转为 uint8
+- `_debug_show_concat` 中间调试窗口同样受 `_max_canvas_width_ratio` / `_max_canvas_height_ratio` 画布上限约束
 
 ---
 
@@ -248,7 +269,12 @@ panorama = accumulator / weights                           # 归一化
   1. 检查 `distanceTransform` 的 maskSize 参数（当前为 5，可尝试 3 获得更平滑的过渡）
   2. 可能是单应性矩阵不够精确，导致重叠区域未对齐
 
-### 4.4 ORB 特征点质量差
+### 4.4 画布或 `_debug_show_concat` 窗口过大
+- **症状**：全景图或中间拼接调试窗口尺寸巨大（远超 `4×` 单图宽 / `1.5×` 单图高）
+- **原因**：`cv2.findHomography` 可能估计出退化的透视/缩放单应性矩阵，导致画布四角范围爆炸
+- **处理**：当前实现已自动拒绝不合理的透视矩阵并回退到纯平移模型；若仍超限，则统一缩放整个画布。可检查日志中的 `Full homography unreasonable` 和 `Canvas ... exceeds limits` 信息。
+
+### 4.5 ORB 特征点质量差
 - **症状**：debug 窗口中绿色圆点稀疏、分布不均（某些区域密集、某些区域几乎没有），或明显角点被跳过
 - **原因**：ORB 的 FAST 角点检测有三个关键控制参数：
   - `nfeatures`（默认 500）：ORB 最终保留的特征点上限。如果设置过低，ORB 会丢弃响应值较低的特征点，导致某些区域空白
