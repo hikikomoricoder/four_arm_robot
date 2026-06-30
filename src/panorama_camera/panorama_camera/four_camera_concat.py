@@ -15,6 +15,7 @@ class FourCameraStitcher:
     debug_concat = False  # True → show incremental panorama at debug_pair
     debug_pair = 1        # which pair to show: 0 (cam0↔1), 1 (cam1↔2), 2 (cam2↔3)
     blend_method = 2  # 0=baseline(weighted avg), 1=multiband, 2=seam, 3=exponent^3, 4=best-image
+    force_center_alignment = True  # constrain image centres to same height (horizontal camera array)
 
     def __init__(self, nfeatures=600, match_ratio=0.95, ransac_thresh=8.0,
                  min_matches=6, crop_ratio=0.35, epipolar_thresh=50.0,
@@ -94,6 +95,26 @@ class FourCameraStitcher:
         if (ys.max() - ys.min()) > self._max_pair_height_ratio * h:
             return False
         return True
+
+    def _constrain_center_height(self, H, w, h):
+        """Adjust homography y-translation so the image centre maps to h/2.
+
+        All rotation, scale, and perspective terms of ``H`` are preserved;
+        only ``H[1, 2]`` (vertical translation) is recomputed so that the
+        source image centre ``(w/2, h/2)`` maps to height ``h/2`` in the
+        destination plane.  This enforces the constraint that adjacent
+        cameras at the same height produce images whose centres align
+        vertically, eliminating the cumulative vertical drift that creates
+        black borders on the panorama.
+        """
+        cx, cy = w / 2.0, h / 2.0
+        denom = H[2, 0] * cx + H[2, 1] * cy + H[2, 2]
+        if abs(denom) < 1e-10:
+            return H
+        new_h12 = cy * denom - H[1, 0] * cx - H[1, 1] * cy
+        H_out = H.copy()
+        H_out[1, 2] = new_h12
+        return H_out
 
     def _estimate_translation_homography(self, src_pts, dst_pts):
         """Fit a pure 2-D translation from src_pts to dst_pts.
@@ -390,6 +411,18 @@ class FourCameraStitcher:
         else:
             ok_dm = [good[i] for i in inlier_indices]
         _debug_show(f'{strategy} OK', ok_dm)
+
+        # ---- centre-height post-correction ---------------------------------
+        # Adjust the vertical translation of H so that the source image
+        # centre maps to the same height as the destination centre.  This is
+        # applied *after* estimation and outlier rejection, leaving the
+        # matching process completely untouched.  It corrects the cumulative
+        # vertical drift caused by depth parallax and spurious rotation
+        # without sacrificing stitch quality.
+        if self.force_center_alignment:
+            H = self._constrain_center_height(H, w, h)
+            self._log.info(
+                f'Applied centre-height correction ({strategy})')
 
         return H
 
