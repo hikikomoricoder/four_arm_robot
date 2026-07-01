@@ -1,3 +1,4 @@
+import os
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -5,6 +6,7 @@ from cv_bridge import CvBridge
 from std_srvs.srv import Trigger
 import cv2
 import numpy as np
+import time
 
 from panorama_camera.four_camera_concat import FourCameraStitcher
 from panorama_camera.yolo_onnx import YOLOv11ONNX
@@ -45,7 +47,18 @@ class DisplayFourCamera(Node):
         # Optimisation: avoid redundant stitching when no new frame arrived
         self._images_updated = False
         self._last_panorama = None
+        self._last_annotated_pano = None
         self._updated_indices = [False] * 4  # all 4 cameras must refresh before stitch
+        
+        self.if_det = True
+        self.if_seg = False
+
+        if self.if_det:
+            model_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "yolo11s_det.onnx"
+            )
+            self.detector = YOLOv11ONNX(model_path, conf_thres=0.25, iou_thres=0.45, logger=self.get_logger())
 
     def image_callback(self, msg, index):
         try:
@@ -82,38 +95,52 @@ class DisplayFourCamera(Node):
 
         cv2.imshow('Four Camera View', grid)
 
-        # Compute panorama only when new data arrived (Gazebo ~1 Hz) to avoid
-        # redundant warp+blend work on unchanged frames.
+        # Compute panorama only when all 4 cameras have new data (~1 Hz)
         if self._images_updated:
             self._images_updated = False
+            t1 = time.time()
             panorama = self.stitcher.stitch(self.images)
+            self.get_logger().info('stitch time: {:.2f} ms'.format((time.time() - t1) * 1000))
+            
             if panorama is not None:
                 self._last_panorama = panorama
-            # else: keep the previous panorama (if any)
 
-        if self._last_panorama is not None:
-            pano_h, pano_w = self._last_panorama.shape[:2]
-            max_w = 2200
-            max_h = 600
-            scale = min(max_w / max(pano_w, 1), max_h / max(pano_h, 1), 1.0)
-            if scale < 1.0:
-                show_pano = cv2.resize(self._last_panorama, None, fx=scale, fy=scale,
-                                       interpolation=cv2.INTER_AREA)
+                # Detection and annotation also run only on fresh panorama
+                max_w, max_h = 1920, 480
+                t1 = time.time()
+                show_pano = cv2.resize(panorama, (max_w, max_h))
+
+                if self.if_det:
+                    detections, show_pano = self.detector.detect(show_pano)
+                    self.get_logger().info(f'Detections: {detections}')
+                    for det in detections:
+                        x1, y1, x2, y2 = det['bbox']
+                        cv2.rectangle(show_pano, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        label = f"{det['class_name']} {det['score']:.2f}"
+                        cv2.putText(
+                            show_pano, label,
+                            (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2,
+                        )
+
+                self._last_annotated_pano = show_pano
+                self.get_logger().info('det time: {:.2f} ms'.format((time.time() - t1) * 1000))
+
+            # Display the latest result (refreshes window at ~15 Hz even when no new data)
+            if self._last_annotated_pano is not None:
+                cv2.imshow('Panorama', self._last_annotated_pano)
             else:
-                show_pano = self._last_panorama
-            cv2.imshow('Panorama', show_pano)
-        else:
-            placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
-            status = self.stitcher.get_status()
-            cv2.putText(placeholder, f'Panorama - {status}', (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.imshow('Panorama', placeholder)
+                placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
+                status = self.stitcher.get_status()
+                cv2.putText(placeholder, f'Panorama - {status}', (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                cv2.imshow('Panorama', placeholder)
 
-        key = cv2.waitKey(1)
-        if key != -1 and (key & 0xFF) == ord('r'):
-            self.get_logger().info(
-                'Keyboard recompute requested; stitch geometry will be recalculated.')
-            self.stitcher.request_recompute()
+            key = cv2.waitKey(1)
+            if key != -1 and (key & 0xFF) == ord('r'):
+                self.get_logger().info(
+                    'Keyboard recompute requested; stitch geometry will be recalculated.')
+                self.stitcher.request_recompute()
 
     def handle_recompute_stitch(self, request, response):
         """ROS service callback to request a recomputation of the stitch geometry."""

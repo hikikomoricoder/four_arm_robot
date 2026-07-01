@@ -25,7 +25,7 @@ COCO_NAMES = [
 
 
 class YOLOv11ONNX:
-    def __init__(self, model_path, conf_thres=0.25, iou_thres=0.45, input_size=(640, 640),
+    def __init__(self, model_path, conf_thres=0.25, iou_thres=0.45, input_size=(480, 480),
                  logger=None, class_names=None):
         self.conf_thres = conf_thres
         self.iou_thres = iou_thres

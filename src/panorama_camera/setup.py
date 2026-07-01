@@ -11,6 +11,9 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
+    package_data={
+        package_name: ['yolo11s_det.onnx'],
+    },
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='dcx',
