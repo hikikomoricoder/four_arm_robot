@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 
 from panorama_camera.four_camera_concat import FourCameraStitcher
-
+from panorama_camera.yolo_onnx import YOLOv11ONNX
 
 class DisplayFourCamera(Node):
     def __init__(self):
@@ -42,10 +42,20 @@ class DisplayFourCamera(Node):
         self.recompute_service = self.create_service(
             Trigger, 'recompute_stitch', self.handle_recompute_stitch)
 
+        # Optimisation: avoid redundant stitching when no new frame arrived
+        self._images_updated = False
+        self._last_panorama = None
+        self._updated_indices = [False] * 4  # all 4 cameras must refresh before stitch
+
     def image_callback(self, msg, index):
         try:
             cv_img = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
             self.images[index] = cv_img
+            self._updated_indices[index] = True
+            # Only trigger stitch when all 4 cameras have sent a new frame
+            if all(self._updated_indices):
+                self._images_updated = True
+                self._updated_indices = [False] * 4
         except Exception as e:
             self.get_logger().error(f'Failed to convert image from camera {index + 1}: {e}')
 
@@ -72,18 +82,25 @@ class DisplayFourCamera(Node):
 
         cv2.imshow('Four Camera View', grid)
 
-        # Compute and show the horizontal panorama
-        panorama = self.stitcher.stitch(self.images)
-        if panorama is not None:
-            pano_h, pano_w = panorama.shape[:2]
-            max_w = 1800
+        # Compute panorama only when new data arrived (Gazebo ~1 Hz) to avoid
+        # redundant warp+blend work on unchanged frames.
+        if self._images_updated:
+            self._images_updated = False
+            panorama = self.stitcher.stitch(self.images)
+            if panorama is not None:
+                self._last_panorama = panorama
+            # else: keep the previous panorama (if any)
+
+        if self._last_panorama is not None:
+            pano_h, pano_w = self._last_panorama.shape[:2]
+            max_w = 2200
             max_h = 600
             scale = min(max_w / max(pano_w, 1), max_h / max(pano_h, 1), 1.0)
             if scale < 1.0:
-                show_pano = cv2.resize(panorama, None, fx=scale, fy=scale,
+                show_pano = cv2.resize(self._last_panorama, None, fx=scale, fy=scale,
                                        interpolation=cv2.INTER_AREA)
             else:
-                show_pano = panorama
+                show_pano = self._last_panorama
             cv2.imshow('Panorama', show_pano)
         else:
             placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
