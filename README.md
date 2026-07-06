@@ -28,7 +28,7 @@ jetson orin nano主控 达妙电机做关节（已大致判断算力与外设资
 - [x] 12.yolo11s det和seg转onnx
 - [x] 13.onnx模型推理前后处理实现
 - [x] 14.全景画面目标检测
-- [ ] 15.场景适配 finetune or distillation
+- [x] 15.场景适配 finetune or distillation
 - [ ] 16.转trt，cuda前后处理与推理
 - [ ] 15.接入双目相机检测与分割
 - [ ] 16.像素坐标，图像坐标，相机坐标，里程计坐标，世界坐标的转换
@@ -50,4 +50,5 @@ jetson orin nano主控 达妙电机做关节（已大致判断算力与外设资
 # panorama
 < img width="1803" height="468" alt="Screenshot from 2026-06-30 13-43-37" src="https://github.com/user-attachments/assets/c0e09cb3-f8c2-47aa-8edb-529d7f0ec025" />
 
-# yolo11s detect
+# yolo11s detect after distillation
+<img width="1440" height="481" alt="1019420845" src="https://github.com/user-attachments/assets/0ef9de0b-6935-46c8-a5ce-7873806884d5" />
