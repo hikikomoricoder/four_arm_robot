@@ -217,12 +217,12 @@
     <include>
       <uri>file:///home/dcx/.gz/models/drc_practice_valve_wall</uri>
       <name>valve_wall</name>
-      <pose>7.8439817428588867 3.282520055770874 -5.4590873860805898e-07 -4.7065136076635028e-18 3.8857805861881995e-20 -3.8176813445999987e-21</pose>
+      <pose>7.8439817428588867 3.282520055770874 -5.4048887408183454e-07 -4.7462499425457485e-18 4.0634162701282253e-20 -3.8409040601474358e-21</pose>
     </include>
     <include>
       <uri>file:///home/dcx/.gz/models/drc_practice_valve_wall</uri>
       <name>valve_wall_0</name>
-      <pose>6.6645495584063976 3.2986299988783032 -8.4067674574793039e-07 2.314148778629922e-11 -6.8309082624931519e-07 2.3222419710875976e-10</pose>
+      <pose>6.6645495584702719 3.2986299988783037 -8.2387558468020463e-07 2.3141757410086017e-11 -6.6931029880464877e-07 2.3222382176589124e-10</pose>
     </include>
     <include>
       <uri>file:///home/dcx/.gz/models/nist_maze_wall_240</uri>
@@ -287,12 +287,12 @@
     <include>
       <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/standing person/3</uri>
       <name>person_standing</name>
-      <pose>4.1393353375745292 1.9014801607491623 -1.8535176877533533e-10 -6.8764438587720642e-21 1.0552819241182609e-20 -6.2134773441096935e-21</pose>
+      <pose>4.1393353375745292 1.9014801607491623 -2.1517204577825578e-10 -1.1202844207858221e-20 1.2704348653265675e-20 -7.6383199149751939e-21</pose>
     </include>
     <include>
       <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/walking person/3</uri>
       <name>person_walking</name>
-      <pose>6.5840425682612178 1.1218762667633491 -2.1546862419979942e-10 -1.453854012829971e-21 1.5491518651833767e-21 -1.2855371611047682e-21</pose>
+      <pose>6.5840425682612178 1.1218762667633491 -2.5013292164442759e-10 -7.9285531059948102e-22 -9.7251369862848816e-22 -1.4511037524933066e-21</pose>
     </include>
     <include>
       <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/dining table/1</uri>
@@ -320,9 +320,9 @@
       <pose>5.9405492263755875 -3.3761478921888135 0 0 0 0</pose>
     </include>
     <include>
-      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/office chair/1</uri>
-      <name>OfficeChair</name>
-      <pose>-1.6488644371197294 1.3440022841182961 0 0 0 0</pose>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/chair/3</uri>
+      <name>Chair</name>
+      <pose>-1.6488644371197294 1.3440022841182961 -7.1367296187313521e-12 -3.2215417584373156e-17 7.2849279784418842e-12 1.1102230246250392e-15</pose>
     </include>
     <include>
       <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/nist maze wall 120/3</uri>
@@ -332,12 +332,12 @@
     <include>
       <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/nist maze wall 120/3</uri>
       <name>nist_maze_wall_120_0</name>
-      <pose>0.6002119779586792 -1.6537145376205444 -0.41794025897979736 1.5231099841608389 0 0</pose>
+      <pose>0.6002119779586792 -1.7210700511932373 -0.41472500562667847 1.5231099841608391 0 0</pose>
     </include>
     <include>
       <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/nist maze wall 120/3</uri>
       <name>nist_maze_wall_120_1</name>
-      <pose>0.6223679780960083 -3.8721098899841309 -0.27312099933624268 1.7694700266641268 0 0</pose>
+      <pose>0.6223679780960083 -3.585904598236084 -0.35577106475830078 1.7694700266641268 0 0</pose>
     </include>
     <include>
       <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/dining chair/1</uri>
@@ -537,7 +537,7 @@
     <include>
       <uri>file:///home/dcx/.gz/models/youbot</uri>
       <name>youbot</name>
-      <pose>-1.9883086028195427 -2.6675804007470001 0.084000005767874905 2.3171001392616618e-10 1.3966557103657066e-09 0.00013838975478938089</pose>
+      <pose>-1.9883107543426768 -2.6675873910224088 0.084000005767874142 2.3169362138894192e-10 1.3966532430329699e-09 0.00027848188933407439</pose>
     </include>
     <include>
       <uri>file:///home/dcx/.gz/models/school</uri>
@@ -558,6 +558,16 @@
       <uri>file:///home/dcx/.gz/models/gazebo</uri>
       <name>gazebo_0</name>
       <pose>-6.9733938786438152 -4.3262792259400129 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/nurse/2</uri>
+      <name>Nurse</name>
+      <pose>-0.58536297082901001 -6.7567501068115234 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/dcx/.gz/fuel/fuel.gazebosim.org/openrobotics/models/normalbed/2</uri>
+      <name>NormalBed</name>
+      <pose>3.2825691699981689 -6.5862598419189453 -4.8536685250816226e-11 1.9627368740698537e-14 -3.0357663351929537e-21 2.470504489536516e-26</pose>
     </include>
     <light name='sun' type='directional'>
       <pose>0 0 10 0 0 0</pose>

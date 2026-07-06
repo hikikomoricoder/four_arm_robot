@@ -20,7 +20,7 @@ COCO_NAMES = [
     "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop",
     "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
     "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier",
-    "toothbrush",
+    "toothbrush", "checkboard"
 ]
 
 
@@ -117,9 +117,15 @@ class YOLOv11ONNX:
         boxes[:, [0, 2]] = np.clip(boxes[:, [0, 2]], 0, w)
         boxes[:, [1, 3]] = np.clip(boxes[:, [1, 3]], 0, h)
 
-        # NMS
+        # NMS expects [x, y, w, h] format; convert from [x1, y1, x2, y2]
+        boxes_xywh = np.column_stack((
+            boxes[:, 0],
+            boxes[:, 1],
+            boxes[:, 2] - boxes[:, 0],
+            boxes[:, 3] - boxes[:, 1]
+        ))
         indices = cv2.dnn.NMSBoxes(
-            boxes.tolist(),
+            boxes_xywh.tolist(),
             scores.tolist(),
             self.conf_thres,
             self.iou_thres

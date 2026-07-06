@@ -12,7 +12,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
     ],
     package_data={
-        package_name: ['yolo11s_det.onnx'],
+        # package_name: ['gazebo_room_coco.onnx'],
     },
     install_requires=['setuptools'],
     zip_safe=True,

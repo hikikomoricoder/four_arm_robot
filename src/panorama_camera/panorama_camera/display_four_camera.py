@@ -24,6 +24,7 @@ class DisplayFourCamera(Node):
         ]
 
         self.images = [None] * 4
+        self.global_iou_thres = 0.35
 
         self.subs = []
         for i, topic in enumerate(self.camera_topics):
@@ -56,9 +57,9 @@ class DisplayFourCamera(Node):
         if self.if_det:
             model_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
-                "yolo11s_det.onnx"
+                "../../../../../../model_weights/gazebo_room_coco.onnx"
             )
-            self.detector = YOLOv11ONNX(model_path, conf_thres=0.25, iou_thres=0.45, logger=self.get_logger())
+            self.detector = YOLOv11ONNX(model_path, conf_thres=0.35, iou_thres=0.45, logger=self.get_logger())
 
     def image_callback(self, msg, index):
         try:
@@ -106,12 +107,53 @@ class DisplayFourCamera(Node):
                 self._last_panorama = panorama
 
                 # Detection and annotation also run only on fresh panorama
-                max_w, max_h = 1920, 480
+                max_w, max_h = 1440, 480
                 t1 = time.time()
                 show_pano = cv2.resize(panorama, (max_w, max_h))
 
                 if self.if_det:
-                    detections, show_pano = self.detector.detect(show_pano)
+                    pano_h, pano_w = show_pano.shape[:2]
+                    sub_size = 480
+                    all_detections = []
+
+                    if pano_w <= sub_size:
+                        # Panorama fits in a single sub-image
+                        dets, _ = self.detector.detect(show_pano)
+                        all_detections = dets
+                    else:
+                        # Split into 4 evenly-spaced overlapping sub-images.
+                        # Each sub-image is exactly 480×480, matching the
+                        # model's native input size — no letterbox waste.
+                        stride_x = (pano_w - sub_size) // 3
+
+                        for i in range(4):
+                            x_start = i * stride_x
+                            x_end = x_start + sub_size
+
+                            # Clamp last sub-image to panorama bounds
+                            if x_end > pano_w:
+                                x_start = pano_w - sub_size
+                                x_end = pano_w
+
+                            # Crop sub-image (full height; pano_h == sub_size
+                            # after the resize above, so no vertical padding)
+                            sub_img = show_pano[0:sub_size, x_start:x_end]
+
+                            # Run detection on this sub-image
+                            sub_dets, _ = self.detector.detect(sub_img)
+
+                            # Offset bounding boxes to panorama coordinates
+                            for det in sub_dets:
+                                det['bbox'][0] += x_start
+                                det['bbox'][2] += x_start
+
+                            all_detections.extend(sub_dets)
+                            
+                    self.get_logger().info(f'Detections before global nms: {all_detections}')
+                    # Global NMS merges duplicates of objects that span
+                    # across overlapping sub-image boundaries
+                    detections = self._global_nms(all_detections)
+
                     self.get_logger().info(f'Detections: {detections}')
                     for det in detections:
                         x1, y1, x2, y2 = det['bbox']
@@ -148,6 +190,32 @@ class DisplayFourCamera(Node):
         response.success = True
         response.message = 'Stitch geometry recomputation requested.'
         return response
+
+    def _global_nms(self, detections, iou_thres=0.45):
+        """Apply global NMS on detections collected from all sub-images.
+
+        Objects that span across overlapping sub-image boundaries will be
+        detected multiple times.  A second-pass NMS over the panorama-space
+        coordinates merges these duplicates into a single detection.
+        """
+        if len(detections) == 0:
+            return []
+
+        # cv2.dnn.NMSBoxes expects [x, y, w, h] format,
+        # but det['bbox'] is in [x1, y1, x2, y2] format
+        boxes_xywh = [
+            [b[0], b[1], b[2] - b[0], b[3] - b[1]]
+            for b in (det['bbox'] for det in detections)
+        ]
+        scores = [det['score'] for det in detections]
+
+        indices = cv2.dnn.NMSBoxes(boxes_xywh, scores,
+                                   self.detector.conf_thres, self.global_iou_thres)
+
+        if len(indices) == 0:
+            return []
+
+        return [detections[i] for i in indices.flatten()]
 
 
 def main(args=None):

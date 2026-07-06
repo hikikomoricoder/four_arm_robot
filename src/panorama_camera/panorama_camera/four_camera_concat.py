@@ -11,7 +11,7 @@ class FourCameraStitcher:
     """
 
     # ---- debug knobs (edit directly in code, not via ROS params) -------
-    debug_match = True   # True → show feature-match visualization
+    debug_match = False   # True → show feature-match visualization
     debug_concat = False  # True → show incremental panorama at debug_pair
     debug_pair = 1        # which pair to show: 0 (cam0↔1), 1 (cam1↔2), 2 (cam2↔3)
     blend_method = 2  # 0=baseline(weighted avg), 1=multiband, 2=seam, 3=exponent^3, 4=best-image
