@@ -42,13 +42,16 @@ jetson orin nano主控 达妙电机做关节（已大致判断算力与外设资
 - [ ] 24.slam可能先用nav2跑通
 
 # urdf
-< img width="1459" height="1231" alt="Screenshot from 2026-06-18 11-42-39" src="https://github.com/user-attachments/assets/df39dc09-f0bf-4447-ae6e-8cb4dc699c32" />
+<img width="1459" height="1231" alt="617216885-df39dc09-f0bf-4447-ae6e-8cb4dc699c32" src="https://github.com/user-attachments/assets/63ab8a86-3bab-4c58-ba93-09f68fd4a101" />
+
 
 # gazebo
-< img width="1564" height="919" alt="Screenshot from 2026-07-04 19-49-39" src="https://github.com/user-attachments/assets/31066c51-11b1-4ab2-9b61-6c26ef1a2784" />
+<img width="2142" height="1400" alt="1991447857" src="https://github.com/user-attachments/assets/2302bb85-13eb-4d3e-b5cb-39a8febf853c" />
+
 
 # panorama
-< img width="1803" height="468" alt="Screenshot from 2026-06-30 13-43-37" src="https://github.com/user-attachments/assets/c0e09cb3-f8c2-47aa-8edb-529d7f0ec025" />
+<img width="1803" height="468" alt="617217755-c0e09cb3-f8c2-47aa-8edb-529d7f0ec025" src="https://github.com/user-attachments/assets/8533e07e-8cdf-402a-863e-31d386b2948c" />
+
 
 # yolo11s detect after distillation
 <img width="1440" height="481" alt="1019420845" src="https://github.com/user-attachments/assets/0ef9de0b-6935-46c8-a5ce-7873806884d5" />
