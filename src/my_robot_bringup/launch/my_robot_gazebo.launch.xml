@@ -31,5 +31,8 @@
     <node pkg="panorama_camera" exec="display_four_camera" output="screen">
         <param name="use_sim_time" value="true"/>
     </node>
+    <node pkg="stereo_camera" exec="display_stereo_camera" output="screen">
+        <param name="use_sim_time" value="true"/>
+    </node>
 
 </launch>
