@@ -8,6 +8,10 @@ moveit_simple_controller_manager:
     - veer_controller
     - wheel_controller
     - arm_1_controller
+    - arm_2_controller
+    - arm_3_controller
+    - arm_4_controller
+    - gripper_controller
 
   veer_controller:
     type: FollowJointTrajectory
@@ -25,6 +29,8 @@ moveit_simple_controller_manager:
       - wheel_joint_3
       - wheel_joint_2
       - wheel_joint_1
+    action_ns: follow_joint_trajectory
+    default: true
   arm_1_controller:
     type: FollowJointTrajectory
     joints:
@@ -32,3 +38,38 @@ moveit_simple_controller_manager:
       - arm_joint_3_1
       - arm_joint_5_1
       - arm_joint_7_1
+    action_ns: follow_joint_trajectory
+    default: true
+  arm_2_controller:
+    type: FollowJointTrajectory
+    joints:
+      - arm_joint_1_2
+      - arm_joint_3_2
+      - arm_joint_5_2
+      - arm_joint_7_2
+    action_ns: follow_joint_trajectory
+    default: true
+  arm_3_controller:
+    type: FollowJointTrajectory
+    joints:
+      - arm_joint_1_3
+      - arm_joint_3_3
+      - arm_joint_5_3
+      - arm_joint_7_3
+    action_ns: follow_joint_trajectory
+    default: true
+  arm_4_controller:
+    type: FollowJointTrajectory
+    joints:
+      - arm_joint_1_4
+      - arm_joint_3_4
+      - arm_joint_5_4
+      - arm_joint_7_4
+    action_ns: follow_joint_trajectory
+    default: true
+  gripper_controller:
+    type: FollowJointTrajectory
+    joints:
+      - gripper_left_finger_joint
+    action_ns: follow_joint_trajectory
+    default: true

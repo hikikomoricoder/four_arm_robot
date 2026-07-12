@@ -5,6 +5,18 @@ initial_positions:
   arm_joint_3_1: 0
   arm_joint_5_1: 0
   arm_joint_7_1: 0
+  arm_joint_1_2: 0
+  arm_joint_3_2: 0
+  arm_joint_5_2: 0
+  arm_joint_7_2: 0
+  arm_joint_1_3: 0
+  arm_joint_3_3: 0
+  arm_joint_5_3: 0
+  arm_joint_7_3: 0
+  arm_joint_1_4: 0
+  arm_joint_3_4: 0
+  arm_joint_5_4: 0
+  arm_joint_7_4: 0
   arm_veer_joint_1: 0
   arm_veer_joint_2: 0
   arm_veer_joint_3: 0
@@ -13,3 +25,4 @@ initial_positions:
   wheel_joint_2: 0
   wheel_joint_3: 0
   wheel_joint_4: 0
+  gripper_left_finger_joint: 0
