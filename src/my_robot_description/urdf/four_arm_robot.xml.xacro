@@ -18,7 +18,7 @@
         <origin xyz="0 0 ${wheel_radius*2+veer_height+arm_base_height/2}" rpy="0 0 0" />
     </joint>
 
-    <xacro:macro name="group_joint" params="prefix">
+    <xacro:macro name="arm_veer_joint" params="prefix">
         <joint name="arm_veer_joint_${prefix}" type="revolute">
             <parent link="arm_base_link_${prefix}" />
             <child link="veer_link_${prefix}" />
@@ -29,10 +29,10 @@
         </joint>
     </xacro:macro>
 
-    <xacro:group_joint prefix="1" />
-    <xacro:group_joint prefix="2" />
-    <xacro:group_joint prefix="3" />
-    <xacro:group_joint prefix="4" />
+    <xacro:arm_veer_joint prefix="1" />
+    <xacro:arm_veer_joint prefix="2" />
+    <xacro:arm_veer_joint prefix="3" />
+    <xacro:arm_veer_joint prefix="4" />
 
     <xacro:macro name="branch_joint" params="prefix">
         <joint name="branch_joint_${prefix}" type="fixed">
