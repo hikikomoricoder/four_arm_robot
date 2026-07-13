@@ -71,7 +71,7 @@ public:
    * @param duration      Movement duration (seconds), default 1.0.
    * @return true if the trajectory completed successfully.
    */
-  bool driveForward(double linear_speed = 0.1, double duration = 1.0);
+  bool driveTurn(double linear_speed = 0.1, double duration = 1.0);
 
   /**
    * @brief Differential steering: wheel_joint_1,2 forward,
@@ -80,7 +80,7 @@ public:
    * @param duration      Movement duration (seconds), default 1.0.
    * @return true if the trajectory completed successfully.
    */
-  bool driveTurn(double linear_speed = 0.1, double duration = 1.0);
+  bool driveForward(double linear_speed = 0.1, double duration = 1.0);
 
   // -- low-level API (for advanced use) -----------------------------------
 

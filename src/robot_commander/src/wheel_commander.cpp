@@ -80,15 +80,15 @@ bool WheelCommander::waitForActionServer(const std::chrono::seconds & timeout)
 }
 
 // ============================================================================
-//  driveForward
+//  driveTurn
 // ============================================================================
 
-bool WheelCommander::driveForward(double linear_speed, double duration)
+bool WheelCommander::driveTurn(double linear_speed, double duration)
 {
   const double angular_vel = linear_speed / WHEEL_RADIUS;
 
   RCLCPP_INFO(node_->get_logger(),
-              "[WheelCommander] driveForward: all wheels @ %.3f rad/s (%.3f m/s) for %.1f s",
+              "[WheelCommander] driveTurn: all wheels @ %.3f rad/s (%.3f m/s) for %.1f s",
               angular_vel, linear_speed, duration);
 
   const std::vector<double> velocities = {
@@ -101,15 +101,15 @@ bool WheelCommander::driveForward(double linear_speed, double duration)
 }
 
 // ============================================================================
-//  driveTurn
+//  driveForward
 // ============================================================================
 
-bool WheelCommander::driveTurn(double linear_speed, double duration)
+bool WheelCommander::driveForward(double linear_speed, double duration)
 {
   const double angular_vel = linear_speed / WHEEL_RADIUS;
 
   RCLCPP_INFO(node_->get_logger(),
-              "[WheelCommander] driveTurn: j1,j2 @ +%.3f rad/s, j3,j4 @ -%.3f rad/s  "
+              "[WheelCommander] driveForward: j1,j2 @ +%.3f rad/s, j3,j4 @ -%.3f rad/s  "
               "(%.3f m/s) for %.1f s",
               angular_vel, angular_vel, linear_speed, duration);
 
