@@ -68,5 +68,11 @@
         <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
             <parameters>$(find my_robot_bringup)/config/ros2_controllers.yaml</parameters>
         </plugin>
+        <!-- Publish odom->base_footprint TF so the robot moves in RViz -->
+        <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+            <odom_frame>odom</odom_frame>
+            <robot_base_frame>base_footprint</robot_base_frame>
+            <dimensions>2</dimensions>
+        </plugin>
     </gazebo>
 </robot>
