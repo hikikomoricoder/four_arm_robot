@@ -1,4 +1,5 @@
 <launch>
+    <arg name="log_level" default="warn" />
     <let name="urdf_path" value="$(find-pkg-share my_robot_description)/urdf/four_arm_robot.xml.xacro" />
     <let name="rviz_config_path" value="$(find-pkg-share my_robot_description)/rviz/urdf_config.rviz" />
     <let name="gazebo_config_path" value="$(find-pkg-share my_robot_bringup)/config/gazebo_bridge.yaml" />
@@ -10,10 +11,23 @@
         <param name="use_sim_time" value="true"/>
     </node>
 
-    <node pkg="joint_state_publisher" exec="joint_state_publisher">
+    <!-- <node pkg="joint_state_publisher" exec="joint_state_publisher">
         <param name="robot_description" value="$(var robot_description)" />
         <param name="use_sim_time" value="true"/>
-    </node>
+    </node> -->
+
+    <!-- ros2_control_node is NOT used here: the controller manager is hosted
+            inside Gazebo via gz_ros2_control::GazeboSimROS2ControlPlugin in the URDF -->
+    <timer period="10.5">
+        <node pkg="controller_manager" exec="spawner" args="joint_state_broadcaster" />
+        <node pkg="controller_manager" exec="spawner" args="veer_controller" />
+        <node pkg="controller_manager" exec="spawner" args="wheel_controller" />
+        <node pkg="controller_manager" exec="spawner" args="arm_1_controller" />
+        <node pkg="controller_manager" exec="spawner" args="arm_2_controller" />
+        <node pkg="controller_manager" exec="spawner" args="arm_3_controller" />
+        <node pkg="controller_manager" exec="spawner" args="arm_4_controller" />
+        <node pkg="controller_manager" exec="spawner" args="gripper_controller" />
+    </timer>
 
     <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py">
         <!-- <arg name="gz_args" value="empty.sdf -r" /> -->
@@ -28,10 +42,13 @@
         <param name="use_sim_time" value="true"/>
     </node>
 
-    <node pkg="panorama_camera" exec="display_four_camera" output="screen">
+    <include file="$(find-pkg-share robot_moveit_config)/launch/move_group_gazebo.launch.py" />
+    <!-- <include file="$(find-pkg-share robot_moveit_config)/launch/spawn_controllers.launch.py" /> -->
+
+    <node pkg="panorama_camera" exec="display_four_camera" output="screen" args="--ros-args --log-level $(var log_level)">
         <param name="use_sim_time" value="true"/>
     </node>
-    <node pkg="stereo_camera" exec="display_stereo_camera" output="screen">
+    <node pkg="stereo_camera" exec="display_stereo_camera" output="screen" args="--ros-args --log-level $(var log_level)">
         <param name="use_sim_time" value="true"/>
     </node>
 

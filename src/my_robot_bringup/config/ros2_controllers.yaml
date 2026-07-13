@@ -1,0 +1,153 @@
+# This config file is used by ros2_control
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    veer_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+    wheel_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+    arm_1_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+    arm_2_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+    arm_3_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+    arm_4_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+    gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+joint_state_broadcaster:
+  ros__parameters:
+    joints:
+      - arm_veer_joint_4
+      - arm_veer_joint_3
+      - arm_veer_joint_2
+      - arm_veer_joint_1
+      - wheel_joint_4
+      - wheel_joint_3
+      - wheel_joint_2
+      - wheel_joint_1
+      - arm_joint_1_1
+      - arm_joint_3_1
+      - arm_joint_5_1
+      - arm_joint_7_1
+      - arm_joint_1_2
+      - arm_joint_3_2
+      - arm_joint_5_2
+      - arm_joint_7_2
+      - arm_joint_1_3
+      - arm_joint_3_3
+      - arm_joint_5_3
+      - arm_joint_7_3
+      - arm_joint_1_4
+      - arm_joint_3_4
+      - arm_joint_5_4
+      - arm_joint_7_4
+      - gripper_left_finger_joint
+
+veer_controller:
+  ros__parameters:
+    joints:
+      - arm_veer_joint_4
+      - arm_veer_joint_3
+      - arm_veer_joint_2
+      - arm_veer_joint_1
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+wheel_controller:
+  ros__parameters:
+    joints:
+      - wheel_joint_4
+      - wheel_joint_3
+      - wheel_joint_2
+      - wheel_joint_1
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+arm_1_controller:
+  ros__parameters:
+    joints:
+      - arm_joint_1_1
+      - arm_joint_3_1
+      - arm_joint_5_1
+      - arm_joint_7_1
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+arm_2_controller:
+  ros__parameters:
+    joints:
+      - arm_joint_1_2
+      - arm_joint_3_2
+      - arm_joint_5_2
+      - arm_joint_7_2
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+arm_3_controller:
+  ros__parameters:
+    joints:
+      - arm_joint_1_3
+      - arm_joint_3_3
+      - arm_joint_5_3
+      - arm_joint_7_3
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+arm_4_controller:
+  ros__parameters:
+    joints:
+      - arm_joint_1_4
+      - arm_joint_3_4
+      - arm_joint_5_4
+      - arm_joint_7_4
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+gripper_controller:
+  ros__parameters:
+    joints:
+      - gripper_left_finger_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
