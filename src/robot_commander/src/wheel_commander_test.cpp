@@ -24,9 +24,9 @@ int main(int argc, char **argv)
             "  speed     linear speed in m/s (default 0.1)\n"
             "  duration  movement duration in seconds (default 1.0)\n"
             "\n"
-            "  forward  all four wheels rotate at the same speed\n"
-            "  turn     wheel_joint_1,2 rotate forward,\n"
-            "           wheel_joint_3,4 rotate in reverse\n");
+            "  forward  wheel_joint_1,2 rotate forward,\n"
+            "           wheel_joint_3,4 rotate in reverse\n"
+            "  turn     all four wheels rotate at the same speed\n");
     return 1;
   }
 
@@ -40,7 +40,6 @@ int main(int argc, char **argv)
   robot_commander::WheelCommander commander(node);
 
   if (!commander.waitForJointStates()) { return 1; }
-  if (!commander.waitForActionServer()) { return 1; }
 
   bool ok = false;
   if (mode == "forward") {

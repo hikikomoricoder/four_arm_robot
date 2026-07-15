@@ -8,7 +8,7 @@ controller_manager:
 
 
     wheel_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+      type: velocity_controllers/JointGroupVelocityController
 
 
     arm_1_controller:
@@ -76,6 +76,21 @@ veer_controller:
       - position
       - velocity
     allow_nonzero_velocity_at_trajectory_end: true
+    constraints:
+      goal_time: 5.0
+      stopped_velocity_tolerance: 0.01
+      arm_veer_joint_4:
+        goal: 0.15
+        trajectory: 0.15
+      arm_veer_joint_3:
+        goal: 0.15
+        trajectory: 0.15
+      arm_veer_joint_2:
+        goal: 0.15
+        trajectory: 0.15
+      arm_veer_joint_1:
+        goal: 0.15
+        trajectory: 0.15
 wheel_controller:
   ros__parameters:
     joints:
@@ -84,11 +99,10 @@ wheel_controller:
       - wheel_joint_2
       - wheel_joint_1
     command_interfaces:
-      - position
+      - velocity
     state_interfaces:
       - position
       - velocity
-    allow_nonzero_velocity_at_trajectory_end: true
 arm_1_controller:
   ros__parameters:
     joints:

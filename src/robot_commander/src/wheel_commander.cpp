@@ -1,9 +1,7 @@
 #include <robot_commander/wheel_commander.hpp>
 
-#include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 #include <chrono>
 #include <cmath>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -16,12 +14,13 @@ namespace robot_commander
 
 WheelCommander::WheelCommander(
   rclcpp::Node::SharedPtr node,
-  const std::string & action_topic)
+  const std::string & command_topic)
 : node_(std::move(node)),
-  action_topic_(action_topic)
+  command_topic_(command_topic)
 {
-  // Create the action client (lazy: will connect on first call)
-  action_client_ = rclcpp_action::create_client<FollowJointTrajectory>(node_, action_topic_);
+  // Create the velocity command publisher
+  velocity_pub_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
+    command_topic_, rclcpp::SystemDefaultsQoS());
 
   // Subscribe to /joint_states to keep current positions up to date
   joint_states_sub_ = node_->create_subscription<sensor_msgs::msg::JointState>(
@@ -58,25 +57,6 @@ bool WheelCommander::waitForJointStates(const std::chrono::seconds & timeout)
     }
   }
   return false;
-}
-
-// ============================================================================
-//  waitForActionServer
-// ============================================================================
-
-bool WheelCommander::waitForActionServer(const std::chrono::seconds & timeout)
-{
-  RCLCPP_INFO(node_->get_logger(),
-              "[WheelCommander] Waiting for action server %s ...",
-              action_topic_.c_str());
-  if (!action_client_->wait_for_action_server(timeout)) {
-    RCLCPP_ERROR(node_->get_logger(),
-                 "[WheelCommander] Action server not available: %s",
-                 action_topic_.c_str());
-    return false;
-  }
-  RCLCPP_INFO(node_->get_logger(), "[WheelCommander] Connected to %s", action_topic_.c_str());
-  return true;
 }
 
 // ============================================================================
@@ -132,73 +112,36 @@ bool WheelCommander::driveWithVelocities(const std::vector<double> & velocities,
     return false;
   }
 
-  // Ensure we have joint state data
-  if (!current_positions_.count("wheel_joint_1")) {
-    RCLCPP_WARN(node_->get_logger(),
-                "[WheelCommander] No joint state data yet — call waitForJointStates() first");
-    return false;
+  // ------------------------------------------------------------------
+  // Publish velocity command
+  // ------------------------------------------------------------------
+  std_msgs::msg::Float64MultiArray msg;
+  msg.data = velocities;
+
+  RCLCPP_INFO(node_->get_logger(),
+              "[WheelCommander] Publishing velocity command [%.3f, %.3f, %.3f, %.3f] "
+              "to %s for %.1f s",
+              velocities[0], velocities[1], velocities[2], velocities[3],
+              command_topic_.c_str(), duration);
+
+  velocity_pub_->publish(msg);
+
+  // ------------------------------------------------------------------
+  // Wait for the specified duration using simulation time
+  // ------------------------------------------------------------------
+  const auto deadline = node_->now() + rclcpp::Duration::from_seconds(duration);
+  while (rclcpp::ok() && node_->now() < deadline) {
+    rclcpp::spin_some(node_);
   }
 
   // ------------------------------------------------------------------
-  // Build trajectory goal
+  // Stop (publish zero velocities)
   // ------------------------------------------------------------------
-  auto goal_msg = FollowJointTrajectory::Goal();
-  goal_msg.trajectory.joint_names = jointNames();
+  std::fill(msg.data.begin(), msg.data.end(), 0.0);
+  velocity_pub_->publish(msg);
+  RCLCPP_INFO(node_->get_logger(), "[WheelCommander] Stopped");
 
-  trajectory_msgs::msg::JointTrajectoryPoint point;
-  point.positions.resize(4);
-  point.velocities.resize(4);
-
-  for (int i = 0; i < 4; ++i) {
-    const auto & jn = jointNames()[i];
-    point.positions[i] = current_positions_[jn] + velocities[i] * duration;
-    point.velocities[i] = velocities[i];
-  }
-  point.time_from_start = rclcpp::Duration::from_seconds(duration);
-  goal_msg.trajectory.points.push_back(std::move(point));
-
-  // ------------------------------------------------------------------
-  // Send goal
-  // ------------------------------------------------------------------
-  RCLCPP_INFO(node_->get_logger(), "[WheelCommander] Sending trajectory goal ...");
-
-  auto send_goal_future = action_client_->async_send_goal(goal_msg);
-  if (rclcpp::spin_until_future_complete(node_, send_goal_future) !=
-      rclcpp::FutureReturnCode::SUCCESS)
-  {
-    RCLCPP_ERROR(node_->get_logger(), "[WheelCommander] Failed to send goal");
-    return false;
-  }
-
-  auto goal_handle = send_goal_future.get();
-  if (!goal_handle) {
-    RCLCPP_ERROR(node_->get_logger(), "[WheelCommander] Goal was rejected by controller");
-    return false;
-  }
-
-  // ------------------------------------------------------------------
-  // Wait for result
-  // ------------------------------------------------------------------
-  RCLCPP_INFO(node_->get_logger(), "[WheelCommander] Goal accepted, waiting for execution ...");
-
-  auto result_future = action_client_->async_get_result(goal_handle);
-  if (rclcpp::spin_until_future_complete(node_, result_future) !=
-      rclcpp::FutureReturnCode::SUCCESS)
-  {
-    RCLCPP_ERROR(node_->get_logger(), "[WheelCommander] Interrupted while waiting for result");
-    return false;
-  }
-
-  auto result = result_future.get();
-  if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
-    RCLCPP_INFO(node_->get_logger(), "[WheelCommander] Trajectory execution succeeded!");
-    return true;
-  }
-
-  RCLCPP_WARN(node_->get_logger(),
-              "[WheelCommander] Trajectory execution failed (code %d)",
-              static_cast<int>(result.code));
-  return false;
+  return rclcpp::ok();
 }
 
 }  // namespace robot_commander

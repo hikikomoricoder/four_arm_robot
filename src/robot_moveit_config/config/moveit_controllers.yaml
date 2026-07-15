@@ -6,7 +6,6 @@ moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControll
 moveit_simple_controller_manager:
   controller_names:
     - veer_controller
-    - wheel_controller
     - arm_1_controller
     - arm_2_controller
     - arm_3_controller
@@ -20,15 +19,6 @@ moveit_simple_controller_manager:
       - arm_veer_joint_3
       - arm_veer_joint_2
       - arm_veer_joint_1
-    action_ns: follow_joint_trajectory
-    default: true
-  wheel_controller:
-    type: FollowJointTrajectory
-    joints:
-      - wheel_joint_4
-      - wheel_joint_3
-      - wheel_joint_2
-      - wheel_joint_1
     action_ns: follow_joint_trajectory
     default: true
   arm_1_controller:

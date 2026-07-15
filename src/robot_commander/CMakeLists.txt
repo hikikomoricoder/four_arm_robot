@@ -18,9 +18,9 @@ set(fmt_DIR "/usr/lib/x86_64-linux-gnu/cmake/fmt")
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rclcpp_action REQUIRED)
 find_package(control_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(example_interfaces REQUIRED)
 find_package(my_robot_interfaces REQUIRED)
@@ -42,32 +42,56 @@ target_include_directories(wheel_commander_lib PUBLIC
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>"
 )
 ament_target_dependencies(wheel_commander_lib
-  rclcpp rclcpp_action control_msgs sensor_msgs)
+  rclcpp sensor_msgs std_msgs)
 target_link_options(wheel_commander_lib PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
 
-# ── Executable ────────────────────────────────────────────────────
-add_executable(wheel_command
-  src/wheel_command.cpp
+add_library(veer_commander_lib SHARED
+  src/veer_commander.cpp
 )
-ament_target_dependencies(wheel_command
+target_include_directories(veer_commander_lib PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>"
+)
+ament_target_dependencies(veer_commander_lib
   rclcpp rclcpp_action control_msgs sensor_msgs)
+target_link_options(veer_commander_lib PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
+
+# ── Executable ────────────────────────────────────────────────────
+add_executable(wheel_commander_test
+  src/wheel_commander_test.cpp
+)
+ament_target_dependencies(wheel_commander_test
+  rclcpp sensor_msgs std_msgs)
 # wheel_commander_lib must be linked with plain signature to stay
 # compatible with the plain signature used internally by
 # ament_target_dependencies above.
-target_link_libraries(wheel_command wheel_commander_lib)
+target_link_libraries(wheel_commander_test wheel_commander_lib)
 # Keep wheel_commander_lib discoverable at runtime (both installed in
 # lib/${PROJECT_NAME}/).  $ORIGIN resolves to the directory of the
 # executable itself.
-set_target_properties(wheel_command PROPERTIES
+set_target_properties(wheel_commander_test PROPERTIES
   INSTALL_RPATH "\$ORIGIN"
 )
-target_link_options(wheel_command PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
+target_link_options(wheel_commander_test PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
+
+add_executable(veer_commander_test
+  src/veer_commander_test.cpp
+)
+ament_target_dependencies(veer_commander_test
+  rclcpp rclcpp_action control_msgs sensor_msgs)
+target_link_libraries(veer_commander_test veer_commander_lib)
+set_target_properties(veer_commander_test PROPERTIES
+  INSTALL_RPATH "\$ORIGIN"
+)
+target_link_options(veer_commander_test PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
 
 # ── Install ────────────────────────────────────────────────────────
 install(TARGETS
   wheel_commander_lib
+  veer_commander_lib
   test_moveit
-  wheel_command
+  wheel_commander_test
+  veer_commander_test
   EXPORT ${PROJECT_NAME}Targets
   DESTINATION lib/${PROJECT_NAME}/
 )
