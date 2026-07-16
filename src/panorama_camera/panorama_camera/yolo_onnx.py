@@ -3,12 +3,12 @@ import numpy as np
 import sys
 import logging
 
-for path in sys.path:
-    print(path, flush=True)
+# for path in sys.path:
+#     print(path, flush=True)
 import onnxruntime as ort
 import time
 
-# Default COCO class names used by YOLOv8
+# Default COCO class names used by YOLOv11
 COCO_NAMES = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat",
     "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat",

@@ -9,7 +9,7 @@ import numpy as np
 import time
 
 from panorama_camera.four_camera_concat import FourCameraStitcher
-from panorama_camera.yolo_onnx import YOLOv11ONNX
+from panorama_camera.detect_locate import Yolo11OnnxDetector
 
 class DisplayFourCamera(Node):
     def __init__(self):
@@ -59,7 +59,9 @@ class DisplayFourCamera(Node):
                 os.path.dirname(os.path.abspath(__file__)),
                 "../../../../../../model_weights/gazebo_room_coco.onnx"
             )
-            self.detector = YOLOv11ONNX(model_path, conf_thres=0.35, iou_thres=0.45, logger=self.get_logger())
+            self.detector = Yolo11OnnxDetector(model_path, conf_thres=0.35, iou_thres=0.45,
+                                        global_iou_thres=self.global_iou_thres,
+                                        logger=self.get_logger())
 
     def image_callback(self, msg, index):
         try:
@@ -75,26 +77,26 @@ class DisplayFourCamera(Node):
 
     def display_cameras(self):
         display_imgs = []
-        for i in range(4):
-            if self.images[i] is not None:
-                img = self.images[i].copy()
-                h, w = img.shape[:2]
-                cv2.putText(img, f'Camera {i + 1}', (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                display_imgs.append(img)
-            else:
-                # Show placeholder while waiting for first image
-                blank = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(blank, f'Camera {i + 1} - Waiting...', (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                display_imgs.append(blank)
+        # for i in range(4):
+        #     if self.images[i] is not None:
+        #         img = self.images[i].copy()
+        #         h, w = img.shape[:2]
+        #         cv2.putText(img, f'Camera {i + 1}', (10, 30),
+        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        #         display_imgs.append(img)
+        #     else:
+        #         # Show placeholder while waiting for first image
+        #         blank = np.zeros((480, 640, 3), dtype=np.uint8)
+        #         cv2.putText(blank, f'Camera {i + 1} - Waiting...', (10, 30),
+        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        #         display_imgs.append(blank)
 
-        # Arrange 4 cameras in a 2x2 grid
-        top = np.hstack((display_imgs[0], display_imgs[1]))
-        bottom = np.hstack((display_imgs[2], display_imgs[3]))
-        grid = np.vstack((top, bottom))
+        # # Arrange 4 cameras in a 2x2 grid
+        # top = np.hstack((display_imgs[0], display_imgs[1]))
+        # bottom = np.hstack((display_imgs[2], display_imgs[3]))
+        # grid = np.vstack((top, bottom))
 
-        cv2.imshow('Four Camera View', grid)
+        # cv2.imshow('Four Camera View', grid)
 
         # Compute panorama only when all 4 cameras have new data (~1 Hz)
         if self._images_updated:
@@ -112,47 +114,7 @@ class DisplayFourCamera(Node):
                 show_pano = cv2.resize(panorama, (max_w, max_h))
 
                 if self.if_det:
-                    pano_h, pano_w = show_pano.shape[:2]
-                    sub_size = 480
-                    all_detections = []
-
-                    if pano_w <= sub_size:
-                        # Panorama fits in a single sub-image
-                        dets, _ = self.detector.detect(show_pano)
-                        all_detections = dets
-                    else:
-                        # Split into 4 evenly-spaced overlapping sub-images.
-                        # Each sub-image is exactly 480×480, matching the
-                        # model's native input size — no letterbox waste.
-                        stride_x = (pano_w - sub_size) // 3
-
-                        for i in range(4):
-                            x_start = i * stride_x
-                            x_end = x_start + sub_size
-
-                            # Clamp last sub-image to panorama bounds
-                            if x_end > pano_w:
-                                x_start = pano_w - sub_size
-                                x_end = pano_w
-
-                            # Crop sub-image (full height; pano_h == sub_size
-                            # after the resize above, so no vertical padding)
-                            sub_img = show_pano[0:sub_size, x_start:x_end]
-
-                            # Run detection on this sub-image
-                            sub_dets, _ = self.detector.detect(sub_img)
-
-                            # Offset bounding boxes to panorama coordinates
-                            for det in sub_dets:
-                                det['bbox'][0] += x_start
-                                det['bbox'][2] += x_start
-
-                            all_detections.extend(sub_dets)
-                            
-                    self.get_logger().info(f'Detections before global nms: {all_detections}')
-                    # Global NMS merges duplicates of objects that span
-                    # across overlapping sub-image boundaries
-                    detections = self._global_nms(all_detections)
+                    detections = self.detector.detect_panorama(show_pano)
 
                     self.get_logger().info(f'Detections: {detections}')
                     for det in detections:
@@ -190,32 +152,6 @@ class DisplayFourCamera(Node):
         response.success = True
         response.message = 'Stitch geometry recomputation requested.'
         return response
-
-    def _global_nms(self, detections, iou_thres=0.45):
-        """Apply global NMS on detections collected from all sub-images.
-
-        Objects that span across overlapping sub-image boundaries will be
-        detected multiple times.  A second-pass NMS over the panorama-space
-        coordinates merges these duplicates into a single detection.
-        """
-        if len(detections) == 0:
-            return []
-
-        # cv2.dnn.NMSBoxes expects [x, y, w, h] format,
-        # but det['bbox'] is in [x1, y1, x2, y2] format
-        boxes_xywh = [
-            [b[0], b[1], b[2] - b[0], b[3] - b[1]]
-            for b in (det['bbox'] for det in detections)
-        ]
-        scores = [det['score'] for det in detections]
-
-        indices = cv2.dnn.NMSBoxes(boxes_xywh, scores,
-                                   self.detector.conf_thres, self.global_iou_thres)
-
-        if len(indices) == 0:
-            return []
-
-        return [detections[i] for i in indices.flatten()]
 
 
 def main(args=None):
