@@ -9,7 +9,7 @@ import numpy as np
 import time
 
 from panorama_camera.four_camera_concat import FourCameraStitcher
-from panorama_camera.detect_locate import Yolo11OnnxDetector
+from panorama_camera.detect_locate import Yolo11OnnxDetector, Yolo11TrtDetector
 
 class DisplayFourCamera(Node):
     def __init__(self):
@@ -55,11 +55,18 @@ class DisplayFourCamera(Node):
         self.if_seg = False
 
         if self.if_det:
+            # model_path = os.path.join(
+            #     os.path.dirname(os.path.abspath(__file__)),
+            #     "../../../../../../model_weights/gazebo_room_coco.onnx"
+            # )
+            # self.detector = Yolo11OnnxDetector(model_path, conf_thres=0.35, iou_thres=0.45,
+            #                             global_iou_thres=self.global_iou_thres,
+            #                             logger=self.get_logger())
             model_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
-                "../../../../../../model_weights/gazebo_room_coco.onnx"
+                "../../../../../../model_weights/gazebo_room_coco.engine"
             )
-            self.detector = Yolo11OnnxDetector(model_path, conf_thres=0.35, iou_thres=0.45,
+            self.detector = Yolo11TrtDetector(model_path, conf_thres=0.35, iou_thres=0.45,
                                         global_iou_thres=self.global_iou_thres,
                                         logger=self.get_logger())
 
