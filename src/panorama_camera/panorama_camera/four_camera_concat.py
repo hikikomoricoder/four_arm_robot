@@ -37,8 +37,16 @@ class FourCameraStitcher:
         self._adj_homographies = None
         self._warp_homographies = None
         self._canvas_size = None
+        self._img_size = None
         self._ready = False
         self._recompute = True
+
+        # Geometry version: bumped every successful compute_stitch so that
+        # derived data (e.g. the interval-boundary table) can detect stale
+        # caches.  ``_interval_cache`` stores
+        # (geom_version, axis_angles, step_deg, table).
+        self._geom_version = 0
+        self._interval_cache = None
 
         # Geometric sanity limits for a pairwise homography.  These keep the
         # panorama from exploding when feature matching produces a degenerate
@@ -695,8 +703,10 @@ class FourCameraStitcher:
         self._adj_homographies = adj
         self._warp_homographies = warp_homographies
         self._canvas_size = (canvas_w, canvas_h)
+        self._img_size = (h, w)
         self._ready = True
         self._recompute = False
+        self._geom_version += 1
         return True
 
     def stitch(self, images):
@@ -741,6 +751,162 @@ class FourCameraStitcher:
             panorama = self._weighted_blend(warped_images, weight_maps, exponent=1.0)
 
         return panorama
+
+    # ── Azimuth → panorama-X mapping (10° interval segmentation) ─────────────
+
+    @staticmethod
+    def _wrap_deg(angle):
+        """Wrap an angle in degrees to [-180, 180)."""
+        return (angle + 180.0) % 360.0 - 180.0
+
+    @classmethod
+    def _unwrap_axes(cls, axes):
+        """Unwrap axis azimuths (deg, [0, 360)) into a contiguous sequence
+        preserving camera adjacency order (cam0 -> cam1 -> cam2 -> cam3).
+        Works for both CCW and CW ring layouts."""
+        axes_u = [axes[0]]
+        for a in axes[1:]:
+            axes_u.append(axes_u[-1] + cls._wrap_deg(a - axes_u[-1]))
+        return axes_u
+
+    def angle_to_pano_x(self, thetas_deg, axis_angles_deg=(0.0, 90.0, 180.0, 270.0),
+                        fov_deg=120.0):
+        """Map world azimuth angles to panorama X coordinates.
+
+        ``thetas_deg`` are azimuths (deg) measured from camera 0's optical
+        axis.  ``axis_angles_deg[i]`` is the known azimuth of camera i's
+        optical axis (nominal 0/90/180/270; pass TF-derived values when the
+        robot deforms — uniform spacing is NOT assumed).
+
+        For the ideal (distortion-free) Gazebo pinhole camera a ray at
+        relative azimuth ``rel`` (CCW-positive) lands at pixel
+        ``x = cx - f*tan(rel)`` with ``f = (w/2)/tan(fov/2)`` — image u
+        *decreases* with increasing CCW azimuth for the standard optical
+        frame (z forward, x right, y down).  Projecting that pixel through
+        the same
+        final warp homography used by :meth:`stitch` gives the exact panorama
+        X of the ray — consistent with the actual panorama by construction
+        (translation fallback, centre-height correction and canvas-cap
+        scaling are all included in ``_warp_homographies``).
+
+        Returns a list aligned with ``thetas_deg``; each entry is ``None``
+        when no camera covers that azimuth, otherwise a list of
+        ``(cam_idx, X)`` tuples sorted by angular distance to the camera
+        axis (nearest first).  Azimuths in the wrap-around overlap band are
+        covered by two cameras and therefore yield two X values — the
+        left-head and right-tail occurrences of the duplicated strip.
+        """
+        if not self._ready or self._warp_homographies is None \
+                or self._img_size is None:
+            return [None] * len(thetas_deg)
+
+        h, w = self._img_size
+        cx, cy = w / 2.0, h / 2.0
+        f = cx / np.tan(np.radians(fov_deg / 2.0))
+        half_fov = fov_deg / 2.0
+
+        results = []
+        for theta in thetas_deg:
+            hits = []
+            for i, axis in enumerate(axis_angles_deg):
+                rel = self._wrap_deg(theta - axis)
+                if abs(rel) > half_fov + 1e-6:
+                    continue
+                x_src = cx - f * np.tan(np.radians(rel))
+                pt = np.array([[[x_src, cy]]], dtype=np.float64)
+                X = cv2.perspectiveTransform(
+                    pt, self._warp_homographies[i])[0, 0, 0]
+                hits.append((i, abs(rel), float(X)))
+            # nearest-axis camera first, then drop the sort key
+            hits.sort(key=lambda t: t[1])
+            results.append([(i, X) for i, _, X in hits] if hits else None)
+        return results
+
+    def get_interval_boundaries(self, axis_angles_deg=(0.0, 90.0, 180.0, 270.0),
+                                step_deg=10.0, change_thresh_deg=5.0,
+                                fov_deg=120.0):
+        """X coordinates of per-``step_deg`` azimuth boundaries in the panorama.
+
+        The boundary grid is aligned to multiples of ``step_deg`` in the
+        cam0-axis-relative frame, covering the full angular extent of the
+        camera ring.  The result is cached and recomputed only when
+
+        * the stitching geometry was recomputed (geometry version bump), or
+        * any axis angle deviates from the cached values by
+          ``>= change_thresh_deg`` — smaller drifts reuse the cached table.
+
+        Returns a list of ``(theta_deg, hits)`` where ``hits`` is ``None``
+        or a list of ``(cam_idx, X)`` tuples.  The primary (first) hit is
+        the camera nearest to theta in the *unwrapped* axis frame, so the
+        primary X sequence stays monotonic across the wrap-around overlap
+        band; the duplicate wrap-band hit (if any) follows.  Returns
+        ``None`` when the stitcher is not ready.
+        """
+        if not self._ready:
+            return None
+
+        axes = tuple(float(a) % 360.0 for a in axis_angles_deg)
+        cache = self._interval_cache
+        if cache is not None:
+            c_version, c_axes, c_step, c_table = cache
+            if c_version == self._geom_version and abs(c_step - step_deg) < 1e-9:
+                dev = max(abs(self._wrap_deg(a - c))
+                          for a, c in zip(axes, c_axes))
+                if dev < change_thresh_deg:
+                    return c_table
+
+        # Unwrap axes into a contiguous sequence following camera
+        # adjacency, then cover [min - fov/2, max + fov/2].
+        half_fov = fov_deg / 2.0
+        axes_u = self._unwrap_axes(axes)
+        theta_min = min(axes_u) - half_fov
+        theta_max = max(axes_u) + half_fov
+
+        start = np.ceil(theta_min / step_deg) * step_deg
+        stop = np.floor(theta_max / step_deg) * step_deg
+        thetas = [start + k * step_deg
+                  for k in range(int(round((stop - start) / step_deg)) + 1)]
+
+        hits_list = self.angle_to_pano_x(thetas, axes, fov_deg)
+        # Reorder each entry so the primary (first) hit comes from the
+        # camera nearest to theta in the *unwrapped* axis frame.  This
+        # keeps the primary X sequence monotonic across the wrap-around
+        # overlap band (the duplicate hit remains as the second entry).
+        table = []
+        for theta, hits in zip(thetas, hits_list):
+            if hits and len(hits) > 1:
+                hits = sorted(hits, key=lambda t: abs(theta - axes_u[t[0]]))
+            table.append((theta, hits))
+
+        self._interval_cache = (self._geom_version, axes, step_deg, table)
+        return table
+
+    def get_camera_region_starts(self, axis_angles_deg=(0.0, 90.0, 180.0, 270.0),
+                                 fov_deg=120.0):
+        """Azimuth and panorama X of each camera's region-start boundary.
+
+        A camera's region starts halfway towards the previous camera's
+        optical axis (midpoint of the inter-camera overlap).  With the
+        nominal 0/90/180/270 deg ring this yields -45/45/135/225 deg.
+
+        Returns a list of ``(start_angle_deg, X)`` aligned with the camera
+        order (X is ``None`` when not computable), or ``None`` when the
+        stitcher is not ready.
+        """
+        if not self._ready:
+            return None
+        axes = tuple(float(a) % 360.0 for a in axis_angles_deg)
+        axes_u = self._unwrap_axes(axes)
+        # Previous axis of cam0 is cam3 shifted one full turn backwards.
+        direction = 1.0 if axes_u[-1] >= axes_u[0] else -1.0
+        prev0 = axes_u[-1] - 360.0 * direction
+        starts = []
+        for i in range(len(axes_u)):
+            prev = prev0 if i == 0 else axes_u[i - 1]
+            starts.append((prev + axes_u[i]) / 2.0)
+        hits_list = self.angle_to_pano_x(starts, axes, fov_deg)
+        return [(ang, hits[0][1] if hits else None)
+                for ang, hits in zip(starts, hits_list)]
 
     def get_status(self):
         """Return a short human-readable status string."""

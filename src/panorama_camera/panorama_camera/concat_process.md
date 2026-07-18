@@ -261,6 +261,44 @@ panorama = accumulator / weights                           # 归一化
 - 最后 clip 到 [0, 255] 并转为 uint8
 - `_debug_show_concat` 中间调试窗口同样受 `_max_canvas_width_ratio` / `_max_canvas_height_ratio` 画布上限约束
 
+### 2.5 方位角 → 全景 X 坐标映射（10° 区间分割）
+
+拼接后的全景图位于 cam0 成像平面上，**X 坐标与方位角不是线性关系**（正切/投影关系，且在距 cam0 光轴 ±90° 以外发散），因此不能对全景图 X 轴做均匀等分。但利用已知先验可以**逐相机精确解析**任意方位角在全景图中的 X 坐标：
+
+**已知先验：**
+- 每台相机光轴的方位角 `θ_i`（基准 0°/90°/180°/270°；机器人变形后由 TF 实时读取，仍为已知，且不要求均匀间隔）
+- Gazebo 理想针孔相机（无畸变）：相对方位角 `rel`（逆时针为正）的光线在相机 i 中落在像素 `x_src = cx - f·tan(rel)`，其中 `f = (w/2)/tan(60°) ≈ 184.75 px。注意符号：标准光学坐标系（z 前、x 右、y 下）下图像 u 随逆时针方位角增大而**减小**
+
+**映射方法（`angle_to_pano_x`）：**
+
+```
+对给定方位角 θ：
+  1. 找出所有覆盖 θ 的相机（|wrap(θ - θ_i)| ≤ 60°）
+  2. 计算该光线在相机 i 中的像素 x_src = 320 - f·tan(θ - θ_i)
+  3. 用 stitch() 实际使用的 _warp_homographies[i] 将 (x_src, 240) 投影到全景画布 → X
+```
+
+- 由于使用与 `stitch()` **同一组最终单应性矩阵**，映射结果与实际全景图严格自洽（平移回退、中心高度修正、画布缩放全部自动包含在内）
+- **首尾重复带**：被两台相机同时覆盖的方位角（如 300°~330° 同时被 cam3 和 cam0 覆盖）会返回**两个 X 值**——分别对应全景图右尾和左头的重复出现位置；返回列表按距光轴角距排序，最近相机在前
+- 无相机覆盖的方位角返回 `None`
+
+**10° 区间边界（`get_interval_boundaries`）：**
+
+- 边界网格对齐到 cam0 光轴相对坐标系中 10° 的整数倍，覆盖整个相机环的方位角范围（基准配置下为 -60° ~ +330°，共 40 条边界、39 个区间）
+- 每条目的**首个命中为主命中**：取展开（unwrapped）坐标系中距 θ 最近的相机，保证主 X 序列在首尾重叠带处仍然单调递增；重复带命中（若有）排在第二位
+- **缓存与阈值**：结果缓存在 `_interval_cache`，仅当满足以下任一条件时重算：
+  1. 拼接几何被重算（`_geom_version` 递增，即 `compute_stitch` 成功执行后）
+  2. 任一相机光轴方位角与缓存值的偏差 **≥ 5°**（`change_thresh_deg`）
+  - 小于阈值的漂移直接复用缓存表，与节点侧 TF 触发重算的阈值语义一致
+
+**节点侧 TF 监控（`display_four_camera.py`）：**
+
+- 通过 `tf2_ros` 以 1 Hz 查询各 `camera_optical_link_i` 相对 `base_footprint` 的变换
+- 取光学坐标系 +Z 轴（光轴）在基座水平面的投影方位角
+- 任一相机方位角相对记录值漂移 **> 5°** 时：更新记录值与 `axis_angles`，并调用 `request_recompute()` 触发下一帧几何重算
+- 显示窗口中以 `cv2.addWeighted` 叠加半透明色带（`interval_band_alpha`，默认 0.25）：每个 10° 区间填充一个颜色（9 色调色板循环，即每 90° 循环一次，跨越相邻两条主边界 X；主 X 随 θ 可能递增或递减，绘制时取 min/max），首尾重复带在全景图另一端以橙色色带标出（仅当第二命中与主命中相距超过半幅画布时判定为重复带）
+- 文字标注仅 4 个：各相机区域起点（相邻光轴中点，基准为 -45 / 45 / 135 / 225，由 `get_camera_region_starts` 计算），全景图中从右到左依次对应 camera1~camera4
+
 ---
 
 ## 3. 状态管理
@@ -272,8 +310,11 @@ panorama = accumulator / weights                           # 归一化
 | `_adj_homographies` | None | 相邻单应性矩阵列表 [H_0, H_1, H_2] |
 | `_warp_homographies` | None | 含平移的最终单应性矩阵列表 [T@cum[0], T@cum[1], T@cum[2], T@cum[3]] |
 | `_canvas_size` | None | 全景画布尺寸 (w, h) |
+| `_img_size` | None | 归一化输入图像尺寸 (h, w)，用于角度→X 映射的焦距/主点计算 |
+| `_geom_version` | 0 | 几何版本号，`compute_stitch` 成功后递增，用于派生数据缓存失效判断 |
+| `_interval_cache` | None | 10° 区间边界表缓存 (geom_version, axis_angles, step_deg, table) |
 
-外部可通过 `request_recompute()` 方法设置 `_recompute=True`，触发下一帧重新计算几何。
+外部可通过 `request_recompute()` 方法设置 `_recompute=True`，触发下一帧重新计算几何。节点侧另有 TF 监控（1 Hz，5° 阈值）自动触发，见 §2.5。
 
 ---
 
