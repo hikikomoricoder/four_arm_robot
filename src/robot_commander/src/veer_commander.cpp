@@ -133,6 +133,23 @@ bool VeerCommander::setForwardState(double duration)
 }
 
 // ============================================================================
+//  setTurnState
+// ============================================================================
+
+bool VeerCommander::setTurnState(double duration)
+{
+  constexpr double kTurnAngle = M_PI_4;  // 45°
+
+  RCLCPP_INFO(node_->get_logger(),
+              "[VeerCommander] setTurnState: sending all veer joints to "
+              "%.3f rad over %.1f s",
+              kTurnAngle, duration);
+
+  std::vector<double> targets(4, kTurnAngle);
+  return sendPositionGoal(targets, duration);
+}
+
+// ============================================================================
 //  sendPositionGoal  (core implementation)
 // ============================================================================
 

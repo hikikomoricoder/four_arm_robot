@@ -98,6 +98,16 @@ public:
    */
   bool setForwardState(double duration = 3.0);
 
+  /**
+   * @brief Turn state: all four veer joints to +45° (pi/4 rad).
+   *
+   * This is an absolute target — every joint goes to pi/4 rad.
+   *
+   * @param duration  Movement duration (seconds), default 3.0.
+   * @return true if the trajectory completed successfully.
+   */
+  bool setTurnState(double duration = 3.0);
+
   // -- low-level API (for advanced use) -----------------------------------
 
   /**
