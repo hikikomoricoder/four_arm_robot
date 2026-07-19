@@ -89,7 +89,7 @@ class DisplayFourCamera(Node):
                 os.path.dirname(os.path.abspath(__file__)),
                 "../../../../../../model_weights/gazebo_room_coco.engine"
             )
-            self.detector = Yolo11TrtDetector(model_path, conf_thres=0.3, iou_thres=0.45,
+            self.detector = Yolo11TrtDetector(model_path, conf_thres=0.32, iou_thres=0.45,
                                         global_iou_thres=self.global_iou_thres,
                                         logger=self.get_logger())
 
@@ -107,26 +107,26 @@ class DisplayFourCamera(Node):
 
     def display_cameras(self):
         display_imgs = []
-        for i in range(4):
-            if self.images[i] is not None:
-                img = self.images[i].copy()
-                h, w = img.shape[:2]
-                cv2.putText(img, f'Camera {i + 1}', (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                display_imgs.append(img)
-            else:
-                # Show placeholder while waiting for first image
-                blank = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(blank, f'Camera {i + 1} - Waiting...', (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                display_imgs.append(blank)
+        # for i in range(4):
+        #     if self.images[i] is not None:
+        #         img = self.images[i].copy()
+        #         h, w = img.shape[:2]
+        #         cv2.putText(img, f'Camera {i + 1}', (10, 30),
+        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        #         display_imgs.append(img)
+        #     else:
+        #         # Show placeholder while waiting for first image
+        #         blank = np.zeros((480, 640, 3), dtype=np.uint8)
+        #         cv2.putText(blank, f'Camera {i + 1} - Waiting...', (10, 30),
+        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        #         display_imgs.append(blank)
 
-        # Arrange 4 cameras in a 2x2 grid
-        top = np.hstack((display_imgs[0], display_imgs[1]))
-        bottom = np.hstack((display_imgs[2], display_imgs[3]))
-        grid = np.vstack((top, bottom))
+        # # Arrange 4 cameras in a 2x2 grid
+        # top = np.hstack((display_imgs[0], display_imgs[1]))
+        # bottom = np.hstack((display_imgs[2], display_imgs[3]))
+        # grid = np.vstack((top, bottom))
 
-        cv2.imshow('Four Camera View', grid)
+        # cv2.imshow('Four Camera View', grid)
 
         # Compute panorama only when all 4 cameras have new data (~1 Hz)
         if self._images_updated:
