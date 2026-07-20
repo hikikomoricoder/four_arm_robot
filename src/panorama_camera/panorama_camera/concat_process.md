@@ -72,9 +72,10 @@
 stitch(images)
   ├─ 输入校验: 4 幅图像均非空
   ├─ 如果 _recompute == True 或 _ready == False:
-  │     └─ compute_stitch(images)  ← 计算拼接几何
+  │     └─ compute_stitch(images)  ← 计算拼接几何 + 预计算权重图缓存
   ├─ 图像尺寸归一化
-  └─ 对每幅图像用缓存的 _warp_homographies 做透视变换 + 羽化融合
+  ├─ 对每幅图像用缓存的 _warp_homographies 做透视变换
+  └─ 从 _weight_maps / _blend_derived 缓存中获取融合参数做加权累加
        └─ 返回全景图
 ```
 
@@ -104,7 +105,11 @@ compute_stitch(images)
   │     若 canvas_w > `_max_canvas_width_ratio` × 单图宽
   │        或 canvas_h > `_max_canvas_height_ratio` × 单图高
   │     则对所有 `_warp_homographies` 做统一缩放，使输出满足上限
-  ├─ 保存状态: _ready=True, _recompute=False
+  ├─ Step F: 预计算融合权重图（_build_weight_maps）
+  │     对每张图像用 ones mask 做 warpPerspective → distanceTransform，
+  │     结果缓存到 _weight_maps；后续 stitch() 的逐帧路径直接复用
+  │     并失效 _blend_derived，下次 stitch() 时按 blend_method 重建
+  ├─ 保存状态: _ready=True, _recompute=False, _geom_version+=1
   └─ 返回 True
 ```
 
@@ -242,24 +247,43 @@ new_H[1,2] = cy * denom - H[1,0]*cx - H[1,1]*cy
 
 ### 2.4 图像融合（Blending）
 
-在 `stitch()` 的每帧执行阶段，对每幅图像：
+融合所需的羽化权重图**不依赖图像内容**，只在 `compute_stitch()` 成功执行
+时由 `_build_weight_maps()` 预计算一次并缓存到 `_weight_maps` 中：
 
 ```
-for img, H in images × _warp_homographies:
-    warped = cv2.warpPerspective(img, H, canvas_size)     # 透视变换
-    mask   = cv2.warpPerspective(ones, H, canvas_size)     # 变换后的有效区域掩码
-    dist   = cv2.distanceTransform(mask, DIST_L2, 5)      # 距离变换（羽化权重）
-    accumulator += warped * dist                           # 加权累加
-    weights     += dist                                    # 权重累加
-
-panorama = accumulator / weights                           # 归一化
+_build_weight_maps(h, w):
+    for H in _warp_homographies:
+        mask = cv2.warpPerspective(ones, H, canvas_size)  # 有效区域掩码
+        dist = cv2.distanceTransform(mask, DIST_L2, 5)    # 距离变换（羽化权重）
+    → 缓存到 _weight_maps
 ```
 
 - 使用 **distanceTransform** 计算每个像素到有效区域边界的距离
 - 越靠近图像边缘权重越低，实现平滑过渡
 - maskSize=5 意味着使用更精确的 L2 距离近似
-- 最后 clip 到 [0, 255] 并转为 uint8
-- `_debug_show_concat` 中间调试窗口同样受 `_max_canvas_width_ratio` / `_max_canvas_height_ratio` 画布上限约束
+
+各融合方法还会从 `_weight_maps` 派生自身的预计算参数（存储在 `_blend_derived`
+中），包括归一化加权系数、接缝 alpha 图、最佳图像标签等，按 `blend_method`
+惰性构建并在 `blend_method` 变更时自动失效。
+
+在 `stitch()` 的每帧执行阶段，只做图像内容的透视变换和加权累加：
+
+```
+stitch() 每帧:
+    warped_i = cv2.warpPerspective(img_i, H_i, canvas_size)  # 透视变换（仅此部分逐帧）
+    panorama  = Σ warped_i * parameter_i                      # 从缓存取参数做累加
+```
+
+- `blend_method=2（接缝融合）`：使用预计算的 4 张 alpha 图 + alpha_sum，每帧做
+  `accumulator += warped * alpha[..., None]`，最后 `panorama = acc / alpha_sum`
+- `blend_method=0/3（加权平均）`：使用归一化权重图，每帧做 `accumulator += warped * wnorm`
+- `blend_method=1（多频带）`：使用缓存的归一化权重；金字塔构建仍在逐帧进行
+- `blend_method=4（最佳图像）`：使用缓存的标签图做逐像素选取 + 高斯模糊
+- 结果 clip 到 [0, 255] 并转为 uint8
+
+> `_debug_show_concat` 中间调试窗口仍然在每次 `compute_stitch` 调用时重新计算
+> mask 和 distanceTransform，但该函数仅在几何重算时触发（每秒最多 1–2 次），
+> 不影响正常逐帧路径的性能。
 
 ### 2.5 方位角 → 全景 X 坐标映射（10° 区间分割）
 
@@ -313,6 +337,9 @@ panorama = accumulator / weights                           # 归一化
 | `_img_size` | None | 归一化输入图像尺寸 (h, w)，用于角度→X 映射的焦距/主点计算 |
 | `_geom_version` | 0 | 几何版本号，`compute_stitch` 成功后递增，用于派生数据缓存失效判断 |
 | `_interval_cache` | None | 10° 区间边界表缓存 (geom_version, axis_angles, step_deg, table) |
+| `_weight_maps` | None | 预计算的 4 张羽化权重图（float32，画布尺寸），`compute_stitch` 成功后由 `_build_weight_maps` 填充 |
+| `_blend_derived` | None | 当前融合方法从 `_weight_maps` 派生的预计算参数（加权系数/alpha 图/标签图），`blend_method` 切换时自动失效重建 |
+| `_blend_derived_method` | None | 生成 `_blend_derived` 时的 `blend_method` 快照，用于缓存有效判断 |
 
 外部可通过 `request_recompute()` 方法设置 `_recompute=True`，触发下一帧重新计算几何。节点侧另有 TF 监控（1 Hz，5° 阈值）自动触发，见 §2.5。
 

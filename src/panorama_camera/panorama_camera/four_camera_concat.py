@@ -48,6 +48,13 @@ class FourCameraStitcher:
         self._geom_version = 0
         self._interval_cache = None
 
+        # Per-geometry blend caches: weight maps and derived per-blend-method
+        # data depend only on the stitching geometry, not image content, so
+        # they are recomputed inside ``compute_stitch`` instead of every frame.
+        self._weight_maps = None
+        self._blend_derived = None
+        self._blend_derived_method = None
+
         # Geometric sanity limits for a pairwise homography.  These keep the
         # panorama from exploding when feature matching produces a degenerate
         # perspective estimate.
@@ -629,6 +636,67 @@ class FourCameraStitcher:
         blurred = cv2.GaussianBlur(result.astype(np.float32), (0, 0), smooth_sigma)
         return np.clip(blurred, 0, 255).astype(np.uint8)
 
+    # ── Static blend-data caches (geometry-dependent, recomputed once) ────
+
+    def _build_weight_maps(self, h, w):
+        """Warp the per-image valid masks once and compute distance weights.
+
+        This is the expensive part (4 mask warps + 4 distance transforms on
+        the full canvas) and is purely geometry-dependent.
+        """
+        ones = np.ones((h, w), dtype=np.uint8)
+        weight_maps = []
+        for H in self._warp_homographies:
+            mask = cv2.warpPerspective(ones, H, self._canvas_size)
+            dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5).astype(np.float32)
+            weight_maps.append(dist)
+        self._weight_maps = weight_maps
+        self._blend_derived = None
+        self._blend_derived_method = None
+
+    def _get_blend_derived(self):
+        """Per-blend-method cached data built from the static weight maps."""
+        if self._blend_derived is not None \
+                and self._blend_derived_method == self.blend_method:
+            return self._blend_derived
+
+        maps = self._weight_maps
+        n = len(maps)
+        if self.blend_method in (0, 3):
+            # Normalised weights: per frame only a weighted sum remains.
+            exponent = 1.0 if self.blend_method == 0 else 3.0
+            pow_maps = [d if exponent == 1.0 else np.power(d, exponent)
+                        for d in maps]
+            wsum = np.maximum(np.sum(pow_maps, axis=0), 1e-10)
+            derived = ('weighted', [wm / wsum for wm in pow_maps])
+        elif self.blend_method == 2:
+            # Seam labels, feather ramp and per-image alpha maps are static.
+            seam_radius = 20
+            wstack = np.stack(maps, axis=-1)
+            best_idx = np.argmax(wstack, axis=-1).astype(np.float32)
+            grad_x = np.abs(np.diff(best_idx, axis=1, append=best_idx[:, -1:])) > 0.5
+            grad_y = np.abs(np.diff(best_idx, axis=0, append=best_idx[-1:, :])) > 0.5
+            boundary = (grad_x | grad_y).astype(np.uint8) * 255
+            bdist = cv2.distanceTransform(255 - boundary, cv2.DIST_L2, 5).astype(np.float32)
+            feather = np.clip(bdist / max(seam_radius, 1), 0, 1)
+            alphas = []
+            for idx in range(n):
+                hard = (best_idx == idx).astype(np.float32)
+                smoothed = cv2.GaussianBlur(hard, (0, 0), seam_radius / 2.0)
+                alphas.append(feather * hard + (1.0 - feather) * smoothed)
+            alpha_sum = np.maximum(np.sum(alphas, axis=0), 1e-10)
+            derived = ('seam', alphas, alpha_sum)
+        elif self.blend_method == 4:
+            wstack = np.stack(maps, axis=-1)
+            derived = ('best', np.argmax(wstack, axis=-1).astype(np.uint8))
+        else:  # multiband: normalised weights cached; pyramids stay per-frame
+            wsum = np.maximum(np.sum(maps, axis=0), 1e-10)
+            derived = ('multiband', [wm / wsum for wm in maps])
+
+        self._blend_derived = derived
+        self._blend_derived_method = self.blend_method
+        return derived
+
     def _normalize_images(self, images):
         """Return a list of images resized to the size of the first image."""
         h, w = images[0].shape[:2]
@@ -707,6 +775,7 @@ class FourCameraStitcher:
         self._ready = True
         self._recompute = False
         self._geom_version += 1
+        self._build_weight_maps(h, w)
         return True
 
     def stitch(self, images):
@@ -726,29 +795,37 @@ class FourCameraStitcher:
         images = self._normalize_images(images)
         h, w = images[0].shape[:2]
 
-        # Warp all images to the canvas and compute distance weight maps.
-        warped_images = []
-        weight_maps = []
-        ones = np.ones((h, w), dtype=np.uint8)
+        # Only the image warps are content-dependent; all mask/distance/
+        # alpha data is rebuilt inside ``compute_stitch`` and reused here.
+        warped_images = [cv2.warpPerspective(img, H, self._canvas_size)
+                         for img, H in zip(images, self._warp_homographies)]
 
-        for img, H in zip(images, self._warp_homographies):
-            warped = cv2.warpPerspective(img, H, self._canvas_size)
-            mask = cv2.warpPerspective(ones, H, self._canvas_size)
-            dist = cv2.distanceTransform(mask, cv2.DIST_L2, 5).astype(np.float32)
-            warped_images.append(warped)
-            weight_maps.append(dist)
+        canvas_h, canvas_w = self._canvas_size[1], self._canvas_size[0]
+        derived = self._get_blend_derived()
+        kind = derived[0]
 
-        # Dispatch to the selected blending method.
-        if self.blend_method == 1:
-            panorama = self._multiband_blend(warped_images, weight_maps)
-        elif self.blend_method == 2:
-            panorama = self._seam_blend(warped_images, weight_maps, seam_radius=20)
-        elif self.blend_method == 3:
-            panorama = self._weighted_blend(warped_images, weight_maps, exponent=3.0)
-        elif self.blend_method == 4:
-            panorama = self._best_image_blend(warped_images, weight_maps, smooth_sigma=1.5)
-        else:
-            panorama = self._weighted_blend(warped_images, weight_maps, exponent=1.0)
+        if kind == 'multiband':
+            panorama = self._multiband_blend(warped_images, derived[1])
+        elif kind == 'seam':
+            _, alphas, alpha_sum = derived
+            acc = np.zeros((canvas_h, canvas_w, 3), dtype=np.float32)
+            for warped, alpha in zip(warped_images, alphas):
+                acc += warped.astype(np.float32) * alpha[..., None]
+            panorama = np.clip(acc / alpha_sum[..., None], 0, 255).astype(np.uint8)
+        elif kind == 'best':
+            _, labels = derived
+            panorama = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
+            for i, warped in enumerate(warped_images):
+                sel = labels == i
+                panorama[sel] = warped[sel]
+            panorama = cv2.GaussianBlur(panorama.astype(np.float32), (0, 0), 1.5)
+            panorama = np.clip(panorama, 0, 255).astype(np.uint8)
+        else:  # weighted (exponent 1 or 3)
+            _, wnorm = derived
+            acc = np.zeros((canvas_h, canvas_w, 3), dtype=np.float32)
+            for warped, wn in zip(warped_images, wnorm):
+                acc += warped.astype(np.float32) * wn[..., None]
+            panorama = np.clip(acc, 0, 255).astype(np.uint8)
 
         return panorama
 
