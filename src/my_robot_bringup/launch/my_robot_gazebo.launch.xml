@@ -3,6 +3,8 @@
     <let name="urdf_path" value="$(find-pkg-share my_robot_description)/urdf/four_arm_robot.xml.xacro" />
     <let name="rviz_config_path" value="$(find-pkg-share my_robot_description)/rviz/urdf_config.rviz" />
     <let name="gazebo_config_path" value="$(find-pkg-share my_robot_bringup)/config/gazebo_bridge.yaml" />
+    <let name="left_camera_config_path" value="$(find-pkg-share my_robot_bringup)/config/left_camera.yaml" />
+    <let name="right_camera_config_path" value="$(find-pkg-share my_robot_bringup)/config/right_camera.yaml" />
 
     <let name="robot_description" value="$(command 'xacro $(var urdf_path)')" />
 
@@ -48,7 +50,39 @@
     <node pkg="panorama_camera" exec="display_four_camera" output="screen" args="--ros-args --log-level $(var log_level)">
         <param name="use_sim_time" value="true"/>
     </node>
-    <node pkg="stereo_camera" exec="display_stereo_camera" output="screen" args="--ros-args --log-level $(var log_level)">
+
+    <!-- ===================== Stereo ranging (camera_5 / camera_6) ===================== -->
+    <!-- Gazebo bridges camera_info with Tx=0 (monocular). These corrector nodes relay
+         the messages and replace the calibration matrices with correct stereo values
+         (right camera Tx = -fx * baseline) so stereo_image_proc computes metric disparity. -->
+    <node pkg="stereo_camera" exec="camera_info_corrector"
+          name="camera_info_corrector_left" output="screen">
+        <param name="use_sim_time" value="true"/>
+        <param name="calibration_file" value="$(var left_camera_config_path)" />
+        <param name="input_topic"      value="/_gz/camera_5/camera_info" />
+        <param name="output_topic"     value="/camera_5/camera_info" />
+    </node>
+    <node pkg="stereo_camera" exec="camera_info_corrector"
+          name="camera_info_corrector_right" output="screen">
+        <param name="use_sim_time" value="true"/>
+        <param name="calibration_file" value="$(var right_camera_config_path)" />
+        <param name="input_topic"      value="/_gz/camera_6/camera_info" />
+        <param name="output_topic"     value="/camera_6/camera_info" />
+    </node>
+
+    <!-- stereo_image_proc disparity node: consumes the raw left/right images and the
+         corrected camera_info, publishes /disparity (stereo_msgs/DisparityImage). -->
+    <node pkg="stereo_image_proc" exec="disparity_node" name="disparity" output="screen">
+        <param name="use_sim_time" value="true"/>
+        <param name="queue_size" value="10"/>
+        <remap from="left/image_rect"   to="/camera_5/image_raw"/>
+        <remap from="right/image_rect"  to="/camera_6/image_raw"/>
+        <remap from="left/camera_info"  to="/camera_5/camera_info"/>
+        <remap from="right/camera_info" to="/camera_6/camera_info"/>
+    </node>
+
+    <!-- TensorRT detection on the left image + stereo distance estimation + display. -->
+    <node pkg="stereo_camera" exec="stereo_camera_processor" output="screen" args="--ros-args --log-level $(var log_level)">
         <param name="use_sim_time" value="true"/>
     </node>
 

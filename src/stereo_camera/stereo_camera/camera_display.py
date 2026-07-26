@@ -14,8 +14,8 @@ class CameraProcessor(Node):
     def __init__(self):
         super().__init__("camera_processor")
         self.get_logger().info("import path")
-        for path in sys.path:
-            self.get_logger().warn("import path "+path)
+        # for path in sys.path:
+        #     self.get_logger().warn("import path "+path)
 
         # 创建 CvBridge 实例
         self.bridge_list = [CvBridge(), CvBridge()]
@@ -54,19 +54,19 @@ class CameraProcessor(Node):
 
             # --- 在这里使用 OpenCV 处理图像 ---
             # 示例：添加文本和显示
-            cv2.putText(
-                cv_image,
-                "frame_num "+str(self.image_counter[camera_id-1]),
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 255, 0),
-                2,
-            )
+            # cv2.putText(
+            #     cv_image,
+            #     "frame_num "+str(self.image_counter[camera_id-1]),
+            #     (10, 30),
+            #     cv2.FONT_HERSHEY_SIMPLEX,
+            #     1,
+            #     (0, 255, 0),
+            #     2,
+            # )
 
             # # 显示图像 (确保有 GUI 环境，或在 Docker 中配置 X11)
-            cv2.imshow("Camera View " + str(camera_id), cv_image)
-            cv2.waitKey(1)  # 必须调用，否则窗口不会刷新
+            # cv2.imshow("Camera View " + str(camera_id), cv_image)
+            # cv2.waitKey(1)  # 必须调用，否则窗口不会刷新
 
         except CvBridgeError as e:
             self.get_logger().error(f"CvBridge Error: {e}")

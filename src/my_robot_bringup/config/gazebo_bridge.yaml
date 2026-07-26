@@ -53,3 +53,18 @@
   ros_type_name: "sensor_msgs/msg/Image"
   gz_type_name: "gz.msgs.Image"
   direction: GZ_TO_ROS
+
+# Stereo camera_info bridged under /_gz prefix; camera_info_corrector nodes
+# republish corrected calibration (Tx = -fx * baseline) on /camera_5|6/camera_info
+# so that stereo_image_proc can compute metric disparity.
+- ros_topic_name: "/_gz/camera_5/camera_info"
+  gz_topic_name: "/camera_5/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/_gz/camera_6/camera_info"
+  gz_topic_name: "/camera_6/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS

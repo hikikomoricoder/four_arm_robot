@@ -169,6 +169,20 @@ class Yolo11TrtDetector:
 
         return self._global_nms(all_detections)
 
+    def detect_single(self, image):
+        """Run detection on a single (non-panorama) image using TRT CUDA.
+
+        Unlike ``detect_panorama`` this does NOT split the image into
+        sub-images — it runs the TRT engine directly on the whole frame,
+        which is appropriate for a single camera view (e.g. stereo ranging
+        on camera_5).  Returns a list of detection dicts with bbox in the
+        input image coordinates.
+        """
+        if image is None:
+            return []
+        dets = self._det.detect_cuda(image)
+        return self._convert_detections(dets)
+
     def _convert_detections(self, dets):
         """Convert TRT detections to standard format with 'bbox' and 'class_name' keys."""
         return [

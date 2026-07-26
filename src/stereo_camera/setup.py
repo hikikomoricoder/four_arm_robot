@@ -25,6 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             "display_stereo_camera = stereo_camera.camera_display:main",
+            "camera_info_corrector = stereo_camera.camera_info_corrector:main",
+            "stereo_camera_processor = stereo_camera.stereo_camera_processor:main",
         ],
     },
 )
