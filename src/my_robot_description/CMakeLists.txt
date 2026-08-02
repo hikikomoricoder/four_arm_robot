@@ -9,8 +9,14 @@ endif()
 find_package(ament_cmake REQUIRED)
 
 install(
-  DIRECTORY urdf launch rviz
+  DIRECTORY urdf launch rviz config
   DESTINATION share/${PROJECT_NAME}/
+)
+
+# Standalone pose-debugging publisher used by display.launch.xml
+install(
+  PROGRAMS scripts/joint_states_preset
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()

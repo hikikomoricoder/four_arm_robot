@@ -31,9 +31,9 @@
             </visual>
             <collision>
                 <geometry>
-                    <sphere radius="0.1" />
+                    <cylinder radius="${wheel_radius}" length="${wheel_length}" />
                 </geometry>
-                <origin xyz="0 0 0" rpy="0 0 0" />
+                <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
             </collision>
             <xacro:cylinder_inertia m="1.0" r="${wheel_radius}" l="${wheel_length}"
                     o_xyz="0 0 0" o_rpy="${pi / 2.0} 0 0"/>

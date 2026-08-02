@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""Publish a fixed joint-state pose loaded from a YAML file.
+
+Used by ``display.launch.xml`` for standalone RViz pose debugging: it
+publishes preset poses (config/poses/*.yaml) so the robot pose can be
+inspected without Gazebo. Optionally the joint_state_publisher_gui slider
+node can be chained after it for fine tuning (GUI reads the topic this
+node publishes and republishes on /joint_states).
+
+Parameters
+----------
+config_file : str
+    Path to the YAML pose file (required).
+joint_states_topic : str
+    Output topic (default "/joint_states").
+publish_frequency : float
+    Publish rate in Hz (default 10.0).
+publish_count : int
+    Number of messages to publish before stopping (default 0 = publish
+    forever). A bounded count lets the node "seed" a downstream
+    joint_state_publisher(_gui) with the pose and then yield, so the GUI
+    sliders can take over for interactive fine tuning.
+
+YAML format
+-----------
+A mapping of joint name to position value, either nested:
+
+    joints:
+      arm_joint_1_1: 0.7853981633974483
+      ...
+
+or flat at the top level:
+
+    arm_joint_1_1: 0.7853981633974483
+"""
+
+import sys
+
+import yaml
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+
+
+class JointStatesPreset(Node):
+    """Publishes a fixed joint-state pose from a YAML file."""
+
+    def __init__(self):
+        super().__init__('joint_states_preset')
+        self.declare_parameter('config_file', '')
+        self.declare_parameter('joint_states_topic', '/joint_states')
+        self.declare_parameter('publish_frequency', 10.0)
+        self.declare_parameter('publish_count', 0)
+
+        config_file = self.get_parameter('config_file').value
+        topic = self.get_parameter('joint_states_topic').value
+        frequency = self.get_parameter('publish_frequency').value
+        self._publish_count = self.get_parameter('publish_count').value
+        self._published = 0
+
+        if not config_file:
+            self.get_logger().fatal(
+                "Parameter 'config_file' is required (path to a pose YAML file)")
+            raise RuntimeError("missing required parameter 'config_file'")
+
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f) or {}
+        except OSError as exc:
+            self.get_logger().fatal("Failed to read '%s': %s", config_file, exc)
+            raise
+
+        # Accept both nested ("joints: {...}") and flat ("joint_name: value")
+        joints = data.get('joints', data) if isinstance(data, dict) else data
+        if not isinstance(joints, dict) or not joints:
+            self.get_logger().fatal(
+                "'%s' does not contain a joint-state mapping", config_file)
+            raise ValueError('invalid pose file format')
+
+        self._names = []
+        self._positions = []
+        for name, value in joints.items():
+            if isinstance(value, (int, float)):
+                self._names.append(str(name))
+                self._positions.append(float(value))
+            else:
+                self.get_logger().warn(
+                    "Ignoring non-numeric entry '%s' in %s", name, config_file)
+
+        if not self._names:
+            self.get_logger().fatal("No valid joints found in '%s'", config_file)
+            raise ValueError('pose file has no joints')
+
+        self._publisher = self.create_publisher(JointState, topic, 10)
+        self._timer = self.create_timer(1.0 / frequency, self._publish)
+
+        self.get_logger().info(
+            "Publishing %d joint(s) from '%s' on '%s' at %.1f Hz%s",
+            len(self._names), config_file, topic, frequency,
+            '' if self._publish_count <= 0
+            else f' ({self._publish_count} message(s) then stop)')
+
+    def _publish(self):
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = self._names
+        msg.position = self._positions
+        self._publisher.publish(msg)
+        self._published += 1
+        if 0 < self._publish_count <= self._published:
+            self._timer.cancel()
+            self.get_logger().info(
+                'Published %d message(s); stopping so downstream nodes can '
+                'take over.', self._published)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = None
+    try:
+        node = JointStatesPreset()
+        rclpy.spin(node)
+    except Exception as exc:  # noqa: BLE001 - report startup errors cleanly
+        print(f'[joint_states_preset] startup failed: {exc}', file=sys.stderr)
+        return 1
+    finally:
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
