@@ -15,16 +15,17 @@ int main(int argc, char **argv)
   if (argc > 1) { mode = argv[1]; }
   if (argc > 2) { duration = std::stod(argv[2]); }
 
-  if (mode != "home" && mode != "forward" && mode != "turn") {
+  if (mode != "home" && mode != "forward" && mode != "turn" && mode != "lift") {
     fprintf(stderr,
             "Usage:  ros2 run robot_commander veer_commander_test <mode> [duration]\n"
-            "  mode      'home', 'forward' or 'turn' (required)\n"
-            "  duration  movement duration in seconds (default 2.0)\n"
+            "  mode      'home', 'forward', 'turn' or 'lift' (required)\n"
+            "  duration  movement duration in seconds (default 3.0)\n"
             "\n"
             "  home      all veer joints to URDF zero (0 rad)\n"
             "  forward   switch to forward/backward state:\n"
-            "            j1 stays, j2 +pi/2, j3 stays, j4 +pi/2\n"
-            "  turn      all veer joints to +45° (pi/4 rad)\n");
+            "            first setHomeState, then j2 -pi/2, j4 -pi/2\n"
+            "  turn      all veer joints to +45\u00B0 (pi/4 rad)\n"
+            "  lift      all veer joints to -45\u00B0 (-pi/4 rad)\n");
     return 1;
   }
 
@@ -42,11 +43,13 @@ int main(int argc, char **argv)
 
   bool ok = false;
   if (mode == "home") {
-    ok = commander.goHome(duration);
+    ok = commander.setHomeState(duration);
   } else if (mode == "forward") {
     ok = commander.setForwardState(duration);
-  } else {
+  } else if (mode == "turn") {
     ok = commander.setTurnState(duration);
+  } else {
+    ok = commander.setLiftState(duration);
   }
 
   rclcpp::shutdown();

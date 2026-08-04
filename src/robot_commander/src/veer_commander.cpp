@@ -1,6 +1,7 @@
 #include <robot_commander/veer_commander.hpp>
 
 #include <trajectory_msgs/msg/joint_trajectory_point.hpp>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <stdexcept>
@@ -80,15 +81,15 @@ bool VeerCommander::waitForActionServer(const std::chrono::seconds & timeout)
 }
 
 // ============================================================================
-//  goHome
+//  setHomeState
 // ============================================================================
 
-bool VeerCommander::goHome(double duration)
+bool VeerCommander::setHomeState(double duration)
 {
   const auto & home = homePositions();
 
   RCLCPP_INFO(node_->get_logger(),
-              "[VeerCommander] goHome: sending all veer joints to "
+              "[VeerCommander] setHomeState: sending all veer joints to "
               "[%.3f, %.3f, %.3f, %.3f] rad over %.1f s",
               home[0], home[1], home[2], home[3], duration);
 
@@ -108,28 +109,51 @@ bool VeerCommander::setForwardState(double duration)
     return false;
   }
 
-  // Build target positions relative to the current state:
-  //   j1 stays, j2 -= pi/2, j3 stays, j4 -= pi/2
+  // Step 1: return to home first, so the forward offset is always relative to home
+  // -------------------------------------------------------------------
+  // Compute a safe setHomeState duration based on the URDF velocity limit (1.0 rad/s)
+  constexpr double kMaxJointVelocity = 1.0;  // from URDF <limit velocity="1.0"/>
+  double max_home_delta = 0.0;
+  for (const auto & jn : jointNames()) {
+    auto it = current_positions_.find(jn);
+    if (it != current_positions_.end()) {
+      max_home_delta = std::max(max_home_delta, std::abs(it->second));
+    }
+  }
+  const double go_home_duration = std::max(max_home_delta / kMaxJointVelocity, 1.0);
+
+  RCLCPP_INFO(node_->get_logger(),
+              "[VeerCommander] setForwardState: setHomeState first (%.1f s, max delta %.3f rad)",
+              go_home_duration, max_home_delta);
+
+  if (!setHomeState(go_home_duration)) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[VeerCommander] setForwardState: setHomeState failed");
+    return false;
+  }
+
+  // Step 2: build forward targets relative to home
+  // -------------------------------------------------------------------
   // Controller joint order: [arm_veer_joint_4, arm_veer_joint_3,
   //                          arm_veer_joint_2, arm_veer_joint_1]
-  const auto & names = jointNames();
-  std::vector<double> targets(4);
-  for (size_t i = 0; i < 4; ++i) {
-    targets[i] = current_positions_[names[i]];
-  }
-  // Index mapping: names[0]=j4, names[1]=j3, names[2]=j2, names[3]=j1
-  targets[0] -= M_PI_2;  // arm_veer_joint_4  -90°
-  // arm_veer_joint_3 stays (no change)
-  targets[2] -= M_PI_2;  // arm_veer_joint_2  -90°
-  // arm_veer_joint_1 stays (no change)
+  auto targets = homePositions();  // start from home {0,0,0,0}
+  targets[0] -= M_PI_2;  // arm_veer_joint_4  -90° from home
+  // arm_veer_joint_3 stays (0 from home)
+  targets[2] -= M_PI_2;  // arm_veer_joint_2  -90° from home
+  // arm_veer_joint_1 stays (0 from home)
+
+  // Ensure enough time for the forward movement given velocity limits and
+  // Gazebo PID tracking lag.  Empirical tuning shows 2.0 s is the minimum
+  // for reliable convergence (position error < 0.15 rad).
+  const double fwd_duration = std::max(duration, 2.0);
 
   RCLCPP_INFO(node_->get_logger(),
               "[VeerCommander] setForwardState: "
               "j1 stays (%.3f), j2 -pi/2 -> %.3f, "
               "j3 stays (%.3f), j4 -pi/2 -> %.3f  over %.1f s",
-              targets[3], targets[2], targets[1], targets[0], duration);
+              targets[3], targets[2], targets[1], targets[0], fwd_duration);
 
-  return sendPositionGoal(targets, duration);
+  return sendPositionGoal(targets, fwd_duration);
 }
 
 // ============================================================================
@@ -140,12 +164,31 @@ bool VeerCommander::setTurnState(double duration)
 {
   constexpr double kTurnAngle = M_PI_4;  // 45°
 
+  // Relative to home (0 rad): every joint rotates +pi/4 -> pi/4
   RCLCPP_INFO(node_->get_logger(),
               "[VeerCommander] setTurnState: sending all veer joints to "
               "%.3f rad over %.1f s",
               kTurnAngle, duration);
 
   std::vector<double> targets(4, kTurnAngle);
+  return sendPositionGoal(targets, duration);
+}
+
+// ============================================================================
+//  setLiftState
+// ============================================================================
+
+bool VeerCommander::setLiftState(double duration)
+{
+  constexpr double kLiftAngle = -M_PI_4;  // -45°
+
+  // Relative to home (0 rad): every joint rotates -pi/4 -> -pi/4
+  RCLCPP_INFO(node_->get_logger(),
+              "[VeerCommander] setLiftState: sending all veer joints to "
+              "%.3f rad over %.1f s",
+              kLiftAngle, duration);
+
+  std::vector<double> targets(4, kLiftAngle);
   return sendPositionGoal(targets, duration);
 }
 

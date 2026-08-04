@@ -29,7 +29,7 @@ namespace robot_commander
  * Usage:
  *   auto node = std::make_shared<rclcpp::Node>(...);
  *   VeerCommander vc(node);
- *   vc.goHome();             // all joints to 0
+ *   vc.setHomeState();      // all joints to 0
  *   vc.setForwardState();    // forward/backward configuration
  */
 class VeerCommander
@@ -76,16 +76,23 @@ public:
    * @param duration  Movement duration (seconds), default 3.0.
    * @return true if the trajectory completed successfully.
    */
-  bool goHome(double duration = 3.0);
+  bool setHomeState(double duration = 3.0);
 
   /**
    * @brief Switch to the forward/backward state.
    *
-   * Relative to the current position:
-   *   - arm_veer_joint_1  stays (no change)
-   *   - arm_veer_joint_2  rotates +pi/2  (+90°)
-   *   - arm_veer_joint_3  stays (no change)
-   *   - arm_veer_joint_4  rotates +pi/2  (+90°)
+   * This is a two-step command:
+   *   1. Return to home (all joints to 0 rad).
+   *   2. Apply the forward offset relative to home:
+   *        - arm_veer_joint_1  stays (0 rad)
+   *        - arm_veer_joint_2  rotates -pi/2  (-90°)
+   *        - arm_veer_joint_3  stays (0 rad)
+   *        - arm_veer_joint_4  rotates -pi/2  (-90°)
+   *
+   * The setHomeState step duration is automatically computed from the URDF
+   * velocity limit (1.0 rad/s) and the current joint displacement.
+   * The forward step uses at least 2.0 s regardless of the passed
+   * @p duration to ensure reliable convergence under Gazebo physics.
    *
    * In the resulting state, joints 1&2 have the same TF direction,
    * joints 3&4 have the same TF direction, and the two groups are
@@ -93,20 +100,36 @@ public:
    * wheels 1,2 rotate together and wheels 3,4 rotate together but
    * opposite to 1,2.
    *
-   * @param duration  Movement duration (seconds), default 3.0.
+   * @param duration  Desired movement duration for the forward step
+   *                  (seconds), default 3.0.  The actual duration may
+   *                  be longer to respect the velocity limit.
    * @return true if the trajectory completed successfully.
    */
   bool setForwardState(double duration = 3.0);
 
   /**
-   * @brief Turn state: all four veer joints to +45° (pi/4 rad).
+   * @brief Turn state: all four veer joints to +45° (pi/4 rad)
+   *        relative to the home (initial) position.
    *
-   * This is an absolute target — every joint goes to pi/4 rad.
+   * Since the home position is 0 rad for all veer joints, this means
+   * every joint moves to pi/4 rad absolute.
    *
    * @param duration  Movement duration (seconds), default 3.0.
    * @return true if the trajectory completed successfully.
    */
   bool setTurnState(double duration = 3.0);
+
+  /**
+   * @brief Lift state: all four veer joints to -45° (-pi/4 rad)
+   *        relative to the home (initial) position.
+   *
+   * Since the home position is 0 rad for all veer joints, this means
+   * every joint moves to -pi/4 rad absolute.
+   *
+   * @param duration  Movement duration (seconds), default 3.0.
+   * @return true if the trajectory completed successfully.
+   */
+  bool setLiftState(double duration = 3.0);
 
   // -- low-level API (for advanced use) -----------------------------------
 
