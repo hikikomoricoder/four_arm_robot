@@ -15,25 +15,32 @@ class StateManagerNode(Node):
       - ``set_group`` — update the state of a named group (with validation)
     """
 
-    # ── Valid state values per group ──────────────────────────────────
-    _VALID_STATES = {
-        "veer":   frozenset({"init", "turn", "forward", "free", "occupy"}),
-        "wheel":  frozenset({"init", "turn", "forward", "free", "occupy"}),
-        "arm":    frozenset({"init", "low", "narrow",
-                             "operate_1", "operate_2", "stabilize",
-                             "free", "occupy"}),
-        "branch": frozenset({"init", "close", "free", "occupy"}),
+    # ── Valid position values per group ───────────────────────────────
+    _VALID_POSITIONS = {
+        "veer":   frozenset({"home", "turn", "forward"}),
+        "wheel":  frozenset({"home", "turn", "forward"}),
+        "arm":    frozenset({"home", "low", "high", "rhombus_1", "rhombus_2",
+                             "operate_1", "operate_2", "stabilize"}),
+        "branch": frozenset({"home", "close"}),
+    }
+
+    # ── Valid status values per group ─────────────────────────────────
+    _VALID_STATUSES = {
+        "veer":   frozenset({"free", "occupy"}),
+        "wheel":  frozenset({"free", "occupy"}),
+        "arm":    frozenset({"free", "occupy"}),
+        "branch": frozenset({"free", "occupy"}),
     }
 
     def __init__(self):
         super().__init__("state_manager")
 
-        # ── Internal state store (all groups start at "init") ────────
+        # ── Internal state store (all groups start at home/free) ──────
         self._states = {
-            "veer":   "init",
-            "wheel":  "init",
-            "arm":    "init",
-            "branch": "init",
+            "veer":   {"position": "home", "status": "free"},
+            "wheel":  {"position": "home", "status": "free"},
+            "arm":    {"position": "home", "status": "free"},
+            "branch": {"position": "home", "status": "free"},
         }
 
         # ── Service ───────────────────────────────────────────────────
@@ -68,10 +75,9 @@ class StateManagerNode(Node):
     # ── Get all ────────────────────────────────────────────────────────
 
     def _populate_all_states(self, response):
-        response.veer_state = self._states["veer"]
-        response.wheel_state = self._states["wheel"]
-        response.arm_state = self._states["arm"]
-        response.branch_state = self._states["branch"]
+        for group in ("veer", "wheel", "arm", "branch"):
+            setattr(response, f"{group}_position", self._states[group]["position"])
+            setattr(response, f"{group}_status",   self._states[group]["status"])
 
     # ── Get group ──────────────────────────────────────────────────────
 
@@ -82,32 +88,54 @@ class StateManagerNode(Node):
                              f" Valid: {', '.join(sorted(self._states))}")
 
         self._populate_all_states(response)
+        s = self._states[group]
         response.success = True
-        response.message = f"{group} = {self._states[group]}"
+        response.message = f"{group}: position={s['position']}, status={s['status']}"
 
     # ── Set group ──────────────────────────────────────────────────────
 
     def _handle_set_group(self, request, response):
         group = request.group_name.strip().lower()
-        state = request.state_name.strip().lower()
+        position = request.position_name.strip().lower()
+        status = request.status_name.strip().lower()
 
         if group not in self._states:
             raise ValueError(f"Unknown group '{request.group_name}'."
                              f" Valid: {', '.join(sorted(self._states))}")
 
-        valid = self._VALID_STATES.get(group)
-        if state not in valid:
+        changed = []
+
+        if position:
+            valid_pos = self._VALID_POSITIONS.get(group)
+            if position not in valid_pos:
+                raise ValueError(
+                    f"Invalid position '{request.position_name}' for group"
+                    f" '{group}'. Valid: {', '.join(sorted(valid_pos))}"
+                )
+            self._states[group]["position"] = position
+            changed.append(f"position={position}")
+
+        if status:
+            valid_sta = self._VALID_STATUSES.get(group)
+            if status not in valid_sta:
+                raise ValueError(
+                    f"Invalid status '{request.status_name}' for group"
+                    f" '{group}'. Valid: {', '.join(sorted(valid_sta))}"
+                )
+            self._states[group]["status"] = status
+            changed.append(f"status={status}")
+
+        if not changed:
             raise ValueError(
-                f"Invalid state '{request.state_name}' for group '{group}'."
-                f" Valid: {', '.join(sorted(valid))}"
+                "At least one of position_name or status_name must be"
+                " provided for set_group"
             )
 
-        self._states[group] = state
-        self.get_logger().info(f"State changed: {group} -> {state}")
+        self.get_logger().info(f"State changed: {group} -> {', '.join(changed)}")
 
         self._populate_all_states(response)
         response.success = True
-        response.message = f"Set {group} = {state}"
+        response.message = f"Set {group}: {', '.join(changed)}"
 
 
 def main(args=None):
