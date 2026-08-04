@@ -1,7 +1,7 @@
 # robot_commander 测试指令文档
 
-本文档记录 `wheel_commander_test.cpp` 与 `veer_commander_test.cpp` 中各 `mode`
-对应的关节控制目标（目标位置 / 运动速度）。
+本文档记录 `wheel_commander_test.cpp`、`veer_commander_test.cpp` 与
+`arm_commander_test.cpp` 中各 `mode` 对应的关节控制目标（目标位置 / 运动速度）。
 
 ---
 
@@ -124,41 +124,109 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 
 ## 3. arm_commander_test.cpp（机械臂组，位置控制）
 
-整体情况：arm有4个，主体结构完全相同，arm_joint_7_x为arm_joint_5_x的mimic joint，同步带连接arm_joint_5_x转N度，arm_joint_7_x转-1/2N度，由于gazebo不支持mimic joint所以先以独立控制实现，但需要保证1/2的反向转动关系
-要注意结构限制下的不同joint转动速度的倍率关系，确保各joint在同一时刻达到设定位置，且过程均速
-下面_x指四臂都进行相同运动
+- 控制对象：4 个机械臂共 16 个关节（`arm_joint_1_x / 3_x / 5_x / 7_x`，x = 1~4，四臂主体结构完全相同）
+- 控制方式：位置控制，通过 `all_arms_controller`
+  （`joint_trajectory_controller/JointTrajectoryController`）的 `FollowJointTrajectory` action
+  （话题 `/all_arms_controller/follow_joint_trajectory`）
+- 关节限位：`arm_joint_1_x` 为 `[-3.14, 3.14]`，`arm_joint_3/5/7_x` 为 `[-2.35, 2.35]`，URDF 速度限位 `1.0 rad/s`
+- **同步带 mimic 关系**：`arm_joint_7_x` 是 `arm_joint_5_x` 的 mimic joint（同步带连接，
+  `arm_joint_5_x` 转 N 度 → `arm_joint_7_x` 转 `-N/2` 度）。由于 Gazebo 不支持 mimic joint，
+  两关节以独立控制实现，但所有 preset 均保持 `-1/2` 的反向转动关系
+- **控制器关节顺序**（每臂一行为 `[j1, j3, j5, j7]`）：
+  ```
+  [arm_joint_1_1, arm_joint_3_1, arm_joint_5_1, arm_joint_7_1,   // 臂 1
+   arm_joint_1_2, arm_joint_3_2, arm_joint_5_2, arm_joint_7_2,   // 臂 2
+   arm_joint_1_3, arm_joint_3_3, arm_joint_5_3, arm_joint_7_3,   // 臂 3
+   arm_joint_1_4, arm_joint_3_4, arm_joint_5_4, arm_joint_7_4]   // 臂 4
+  ```
+- Home（初始）位置：所有关节 `0 rad`（URDF 零位）
+- 各 preset 目标均定义为相对初始状态的偏移量，先回 home 再施加偏移（两步运动）
 
-mode 1
-名称：low
-调用函数：setLowState(duration)
-arm_joint_3_x相对初始状态转动-pi/4
-arm_joint_5_x相对初始状态转动+pi/2
-arm_joint_7_x相对初始状态转动-pi/4
+运行命令：
 
-mode 2
-名称：high
-调用函数：setHighState(duration)
-arm_joint_3_x相对初始状态转动+pi/8
-arm_joint_5_x相对初始状态转动-pi/4
-arm_joint_7_x相对初始状态转动+pi/8
+```bash
+ros2 run robot_commander arm_commander_test <mode> [duration]
+#   mode      'home' | 'low' | 'high' | 'rhombus_1' | 'rhombus_2'
+#   duration  运动时长（秒），默认 3.0
+```
 
-mode 3
-名称：rhombus_1
-调用函数：setRhombus1State(duration)
-arm_joint_1_1相对初始状态转动+pi/4
-arm_joint_1_2相对初始状态转动-pi/4
-arm_joint_1_3相对初始状态转动+pi/4
-arm_joint_1_4相对初始状态转动-pi/4
+| mode | 调用函数 | 各关节目标位置（rad） | 说明 |
+|------|----------|------------------------|------|
+| `home` | `setHomeState(duration)` | 全部 16 关节 = 0 | 所有关节回到 URDF 零位（单步，无偏移） |
+| `low` | `setLowState(duration)` | 每臂：j1=0, j3=`-pi/4`, j5=`+pi/2`, j7=`-pi/4` | 四臂同动作；j7 为 j5 的 `-1/2` mimic |
+| `high` | `setHighState(duration)` | 每臂：j1=0, j3=`+pi/8`, j5=`-pi/4`, j7=`+pi/8` | 四臂同动作；j7 为 j5 的 `-1/2` mimic |
+| `rhombus_1` | `setRhombus1State(duration)` | j1_1=`+pi/4`, j1_2=`-pi/4`, j1_3=`+pi/4`, j1_4=`-pi/4` | 仅 `arm_joint_1_x` 运动（对角两臂同向），其余 12 关节保持 0 |
+| `rhombus_2` | `setRhombus2State(duration)` | j1_1=`-pi/4`, j1_2=`+pi/4`, j1_3=`-pi/4`, j1_4=`+pi/4` | 仅 `arm_joint_1_x` 运动，与 `rhombus_1` 反向的菱形 |
 
-mode 4
-名称：rhombus_2
-调用函数：setRhombus2State(duration)
-arm_joint_1_1相对初始状态转动-pi/4
-arm_joint_1_2相对初始状态转动+pi/4
-arm_joint_1_3相对初始状态转动-pi/4
-arm_joint_1_4相对初始状态转动+pi/4
+### 各 mode 细节
 
-mode 4
-名称：home
-调用函数：setHomeState(duration)
-arm各关节均回到初始状态
+#### 执行前置流程
+
+每次运行先阻塞等待两个就绪条件（超时均为 5 s）：
+
+1. `waitForJointStates()` — 在 `/joint_states` 上收齐全部 16 个 arm 关节的当前角度。
+2. `waitForActionServer()` — `all_arms_controller` 的 action server 可用。
+
+就绪后按 mode 调用对应 preset 函数；`sendPositionGoal` 发送前还会校验 16 维目标向量
+是否超出 URDF 限位（越限仅打印 WARN，不阻止发送）。
+
+#### 两步运动机制（homeThenOffset）
+
+`low` / `high` / `rhombus_1` / `rhombus_2` 均通过 `homeThenOffset` 执行两步运动，
+保证偏移始终相对初始（home）状态：
+
+1. **第一步 setHomeState（自动时长）**：所有关节回到 0 rad。时长按当前位移与速度限位
+   自动计算：`max(最大位移 / 1.0, 1.0)` s。
+2. **第二步偏移运动**：目标位置 = home（0）+ 各 mode 偏移量，时长为 `max(duration, 2.0)` s
+   （`kMinOffsetDuration`，与 veer `forward` preset 相同的地板值，保证 Gazebo 物理下可靠收敛）。
+
+#### 匀速同步到达机制（sendPositionGoal）
+
+每个 mode 最终生成单点轨迹发送给控制器：
+
+- 每关节速度按 `v_i = (目标_i - 当前_i) / duration` 写入 `point.velocities`，
+  即各关节在 `duration` 内**匀速**运动并在**同一时刻**到达目标位置；
+- 位移越大速度越快（速度与位移成正比），例如 `low` 中 `arm_joint_5_x`（位移 `+pi/2`）
+  的速度是 `arm_joint_3_x`（位移 `-pi/4`）的 2 倍——即结构限制下保证
+  "各 joint 同时到达、过程均速"的转动速度倍率关系；
+- `time_from_start = duration`，`goal_time_tolerance = duration + 3.0` s。
+
+> 与 veer / wheel 不同：arm 各 mode **不参与** `/group_state_manager` 的
+> occupy/free 状态锁定闭环，直接通过 action 发送轨迹。
+
+**home**
+- 目标位置向量（控制器顺序，16 维）：全 0
+- 单步执行（不走 homeThenOffset），运动时长：`duration`（默认 3.0 s）
+
+**low**
+- 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, -pi/4, +pi/2, -pi/4]`
+  - `arm_joint_3_x` 转 `-pi/4`（-45°）
+  - `arm_joint_5_x` 转 `+pi/2`（+90°）
+  - `arm_joint_7_x` 转 `-pi/4`（-45°）＝ `-1/2 × (+pi/2)`，满足 mimic 关系
+  - `arm_joint_1_x` 保持 `0`
+- 偏移步时长：`max(duration, 2.0)` s
+
+**high**
+- 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, +pi/8, -pi/4, +pi/8]`
+  - `arm_joint_3_x` 转 `+pi/8`（+22.5°）
+  - `arm_joint_5_x` 转 `-pi/4`（-45°）
+  - `arm_joint_7_x` 转 `+pi/8`（+22.5°）＝ `-1/2 × (-pi/4)`，满足 mimic 关系
+  - `arm_joint_1_x` 保持 `0`
+- 偏移步时长：`max(duration, 2.0)` s
+
+**rhombus_1**
+- 偏移向量（控制器顺序）：仅 `arm_joint_1_x` 非零，其余 12 关节为 0
+  - `arm_joint_1_1` = `+pi/4`
+  - `arm_joint_1_2` = `-pi/4`
+  - `arm_joint_1_3` = `+pi/4`
+  - `arm_joint_1_4` = `-pi/4`
+- 对角两臂（1&3、2&4）同向转动，形成菱形
+- 偏移步时长：`max(duration, 2.0)` s
+
+**rhombus_2**
+- 偏移向量（控制器顺序）：仅 `arm_joint_1_x` 非零，与 `rhombus_1` 方向相反的菱形
+  - `arm_joint_1_1` = `-pi/4`
+  - `arm_joint_1_2` = `+pi/4`
+  - `arm_joint_1_3` = `-pi/4`
+  - `arm_joint_1_4` = `+pi/4`
+- 偏移步时长：`max(duration, 2.0)` s
