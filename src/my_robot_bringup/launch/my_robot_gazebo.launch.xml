@@ -20,16 +20,18 @@
 
     <!-- ros2_control_node is NOT used here: the controller manager is hosted
             inside Gazebo via gz_ros2_control::GazeboSimROS2ControlPlugin in the URDF -->
-    <timer period="10.5">
+    <timer period="15.5">
         <node pkg="controller_manager" exec="spawner" args="joint_state_broadcaster" />
         <node pkg="controller_manager" exec="spawner" args="veer_controller" />
         <node pkg="controller_manager" exec="spawner" args="wheel_controller" />
-        <node pkg="controller_manager" exec="spawner" args="arm_1_controller" />
-        <node pkg="controller_manager" exec="spawner" args="arm_2_controller" />
-        <node pkg="controller_manager" exec="spawner" args="arm_3_controller" />
-        <node pkg="controller_manager" exec="spawner" args="arm_4_controller" />
+        <node pkg="controller_manager" exec="spawner" args="arm_1_controller --inactive" />
+        <node pkg="controller_manager" exec="spawner" args="arm_2_controller --inactive" />
+        <node pkg="controller_manager" exec="spawner" args="arm_3_controller --inactive" />
+        <node pkg="controller_manager" exec="spawner" args="arm_4_controller --inactive" />
         <node pkg="controller_manager" exec="spawner" args="gripper_controller" />
+        <node pkg="controller_manager" exec="spawner" args="all_arms_controller" />
     </timer>
+    <node pkg="robot_state_manager" exec="state_manager"></node>
 
     <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py">
         <!-- <arg name="gz_args" value="empty.sdf -r" /> -->
