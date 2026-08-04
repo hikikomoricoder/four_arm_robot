@@ -31,6 +31,17 @@ ros2 run robot_commander veer_commander_test <mode> [duration]
 
 ### 各 mode 细节
 
+#### 状态管理控制闭环
+
+每个 `mode` 在执行 `sendPositionGoal` 前后会向 `/group_state_manager` service 发送请求，形成控制闭环：
+
+1. **执行前** — 调用 `get_group` 查询 `veer` 组的 `status`：
+   - 若为 `"free"`，则调用 `set_group` 将 `status` 设为 `"occupy"`、`position` 设为对应的 mode 名（`home`/`forward`/`turn`/`lift`）。
+   - 若不为 `"free"`，则拒绝执行并返回 `false`。
+2. **执行后** — 调用 `set_group` 将 `status` 重置为 `"free"`（`position` 保持不变）。
+
+> **`setForwardState` 特殊处理**：该 mode 内部包含两步运动（先 `setHomeState` 再 forward），锁定（reserve）在整个方法入口处执行一次，内部的 `setHomeState` 调用不会重复锁定；释放（release）在整个方法出口处执行一次。
+
 **home**
 - 目标位置向量（控制器顺序 `[j4, j3, j2, j1]`）：`[0, 0, 0, 0]`
 - 运动时长：`duration`（默认 3.0 s）
@@ -86,6 +97,15 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 | `turn` | `driveTurn(speed, duration)` | j1=`+w`, j2=`+w`, j3=`+w`, j4=`+w` | 所有轮同向同速转动 |
 
 ### 各 mode 细节
+
+#### 状态管理控制闭环
+
+每个 `mode` 在发布速度命令（`driveWithVelocities`）前后会向 `/group_state_manager` service 发送请求，形成控制闭环：
+
+1. **执行前** — 调用 `get_group` 查询 `wheel` 组的 `status`：
+   - 若为 `"free"`，则调用 `set_group` 将 `status` 设为 `"occupy"`、`position` 设为对应的 mode 名（`forward`/`turn`）。
+   - 若不为 `"free"`，则拒绝执行并返回 `false`（不会发布任何速度命令）。
+2. **执行后** — 调用 `set_group` 将 `status` 重置为 `"free"`（`position` 保持不变）。
 
 **forward**
 - 发布速度向量（控制器顺序 `[j4, j3, j2, j1]`）：`[-w, -w, +w, +w]`

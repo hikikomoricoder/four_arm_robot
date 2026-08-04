@@ -24,6 +24,10 @@ VeerCommander::VeerCommander(
   // Create the action client (lazy: will connect on first call)
   action_client_ = rclcpp_action::create_client<FollowJointTrajectory>(node_, action_topic_);
 
+  // Create the group_state_manager service client
+  state_manager_client_ =
+    node_->create_client<robot_interfaces::srv::GroupStateManager>("group_state_manager");
+
   // Subscribe to /joint_states to keep current positions up to date
   joint_states_sub_ = node_->create_subscription<sensor_msgs::msg::JointState>(
     "/joint_states",
@@ -81,11 +85,132 @@ bool VeerCommander::waitForActionServer(const std::chrono::seconds & timeout)
 }
 
 // ============================================================================
+//  reserveVeer   (state management helper)
+// ============================================================================
+
+bool VeerCommander::reserveVeer(const std::string & mode)
+{
+  if (reserved_) {
+    return true;  // already reserved (e.g. nested call from setForwardState)
+  }
+
+  if (!state_manager_client_->wait_for_service(std::chrono::seconds(3))) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[VeerCommander] group_state_manager service not available");
+    return false;
+  }
+
+  // Step 1: check current status
+  auto get_req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
+  get_req->command = "get_group";
+  get_req->group_name = "veer";
+
+  auto get_future = state_manager_client_->async_send_request(get_req);
+  if (rclcpp::spin_until_future_complete(node_, get_future) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[VeerCommander] Failed to call group_state_manager (get_group)");
+    return false;
+  }
+
+  auto get_resp = get_future.get();
+  if (!get_resp->success) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[VeerCommander] get_group failed: %s", get_resp->message.c_str());
+    return false;
+  }
+
+  if (get_resp->veer_status != "free") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[VeerCommander] veer status is '%s' (not 'free'), cannot execute",
+                get_resp->veer_status.c_str());
+    return false;
+  }
+
+  // Step 2: reserve — set status=occupy, position=mode
+  auto set_req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
+  set_req->command = "set_group";
+  set_req->group_name = "veer";
+  set_req->position_name = mode;
+  set_req->status_name = "occupy";
+
+  auto set_future = state_manager_client_->async_send_request(set_req);
+  if (rclcpp::spin_until_future_complete(node_, set_future) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[VeerCommander] Failed to call group_state_manager (set_group)");
+    return false;
+  }
+
+  auto set_resp = set_future.get();
+  if (!set_resp->success) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[VeerCommander] set_group failed: %s", set_resp->message.c_str());
+    return false;
+  }
+
+  RCLCPP_INFO(node_->get_logger(),
+              "[VeerCommander] veer reserved: mode=%s, status=occupy",
+              mode.c_str());
+  reserved_ = true;
+  return true;
+}
+
+// ============================================================================
+//  releaseVeer   (state management helper)
+// ============================================================================
+
+void VeerCommander::releaseVeer()
+{
+  if (!reserved_) {
+    return;  // not currently reserved
+  }
+
+  if (!state_manager_client_->wait_for_service(std::chrono::seconds(1))) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[VeerCommander] group_state_manager service not available for release");
+    reserved_ = false;
+    return;
+  }
+
+  auto req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
+  req->command = "set_group";
+  req->group_name = "veer";
+  req->position_name = "";  // leave position unchanged
+  req->status_name = "free";
+
+  auto future = state_manager_client_->async_send_request(req);
+  if (rclcpp::spin_until_future_complete(node_, future) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[VeerCommander] Failed to release veer state");
+  } else {
+    auto resp = future.get();
+    if (resp->success) {
+      RCLCPP_INFO(node_->get_logger(),
+                  "[VeerCommander] veer released: status=free");
+    } else {
+      RCLCPP_ERROR(node_->get_logger(),
+                   "[VeerCommander] Release failed: %s", resp->message.c_str());
+    }
+  }
+
+  reserved_ = false;
+}
+
+// ============================================================================
 //  setHomeState
 // ============================================================================
 
 bool VeerCommander::setHomeState(double duration)
 {
+  if (!reserveVeer("home")) {
+    return false;
+  }
+
   const auto & home = homePositions();
 
   RCLCPP_INFO(node_->get_logger(),
@@ -93,7 +218,9 @@ bool VeerCommander::setHomeState(double duration)
               "[%.3f, %.3f, %.3f, %.3f] rad over %.1f s",
               home[0], home[1], home[2], home[3], duration);
 
-  return sendPositionGoal(home, duration);
+  bool ok = sendPositionGoal(home, duration);
+  releaseVeer();
+  return ok;
 }
 
 // ============================================================================
@@ -102,10 +229,15 @@ bool VeerCommander::setHomeState(double duration)
 
 bool VeerCommander::setForwardState(double duration)
 {
+  if (!reserveVeer("forward")) {
+    return false;
+  }
+
   // Ensure we have joint state data
   if (!current_positions_.count("arm_veer_joint_1")) {
     RCLCPP_WARN(node_->get_logger(),
                 "[VeerCommander] No joint state data yet — call waitForJointStates() first");
+    releaseVeer();
     return false;
   }
 
@@ -129,6 +261,7 @@ bool VeerCommander::setForwardState(double duration)
   if (!setHomeState(go_home_duration)) {
     RCLCPP_ERROR(node_->get_logger(),
                  "[VeerCommander] setForwardState: setHomeState failed");
+    releaseVeer();
     return false;
   }
 
@@ -153,7 +286,9 @@ bool VeerCommander::setForwardState(double duration)
               "j3 stays (%.3f), j4 -pi/2 -> %.3f  over %.1f s",
               targets[3], targets[2], targets[1], targets[0], fwd_duration);
 
-  return sendPositionGoal(targets, fwd_duration);
+  bool ok = sendPositionGoal(targets, fwd_duration);
+  releaseVeer();
+  return ok;
 }
 
 // ============================================================================
@@ -162,6 +297,10 @@ bool VeerCommander::setForwardState(double duration)
 
 bool VeerCommander::setTurnState(double duration)
 {
+  if (!reserveVeer("turn")) {
+    return false;
+  }
+
   constexpr double kTurnAngle = M_PI_4;  // 45°
 
   // Relative to home (0 rad): every joint rotates +pi/4 -> pi/4
@@ -171,7 +310,9 @@ bool VeerCommander::setTurnState(double duration)
               kTurnAngle, duration);
 
   std::vector<double> targets(4, kTurnAngle);
-  return sendPositionGoal(targets, duration);
+  bool ok = sendPositionGoal(targets, duration);
+  releaseVeer();
+  return ok;
 }
 
 // ============================================================================
@@ -180,6 +321,10 @@ bool VeerCommander::setTurnState(double duration)
 
 bool VeerCommander::setLiftState(double duration)
 {
+  if (!reserveVeer("lift")) {
+    return false;
+  }
+
   constexpr double kLiftAngle = -M_PI_4;  // -45°
 
   // Relative to home (0 rad): every joint rotates -pi/4 -> -pi/4
@@ -189,7 +334,9 @@ bool VeerCommander::setLiftState(double duration)
               kLiftAngle, duration);
 
   std::vector<double> targets(4, kLiftAngle);
-  return sendPositionGoal(targets, duration);
+  bool ok = sendPositionGoal(targets, duration);
+  releaseVeer();
+  return ok;
 }
 
 // ============================================================================

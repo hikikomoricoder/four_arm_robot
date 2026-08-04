@@ -22,6 +22,10 @@ WheelCommander::WheelCommander(
   velocity_pub_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
     command_topic_, rclcpp::SystemDefaultsQoS());
 
+  // Create the group_state_manager service client
+  state_manager_client_ =
+    node_->create_client<robot_interfaces::srv::GroupStateManager>("group_state_manager");
+
   // Subscribe to /joint_states to keep current positions up to date
   joint_states_sub_ = node_->create_subscription<sensor_msgs::msg::JointState>(
     "/joint_states",
@@ -60,11 +64,132 @@ bool WheelCommander::waitForJointStates(const std::chrono::seconds & timeout)
 }
 
 // ============================================================================
+//  reserveWheel   (state management helper)
+// ============================================================================
+
+bool WheelCommander::reserveWheel(const std::string & mode)
+{
+  if (reserved_) {
+    return true;  // already reserved (e.g. nested call)
+  }
+
+  if (!state_manager_client_->wait_for_service(std::chrono::seconds(3))) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] group_state_manager service not available");
+    return false;
+  }
+
+  // Step 1: check current status
+  auto get_req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
+  get_req->command = "get_group";
+  get_req->group_name = "wheel";
+
+  auto get_future = state_manager_client_->async_send_request(get_req);
+  if (rclcpp::spin_until_future_complete(node_, get_future) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] Failed to call group_state_manager (get_group)");
+    return false;
+  }
+
+  auto get_resp = get_future.get();
+  if (!get_resp->success) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] get_group failed: %s", get_resp->message.c_str());
+    return false;
+  }
+
+  if (get_resp->wheel_status != "free") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] wheel status is '%s' (not 'free'), cannot execute",
+                get_resp->wheel_status.c_str());
+    return false;
+  }
+
+  // Step 2: reserve — set status=occupy, position=mode
+  auto set_req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
+  set_req->command = "set_group";
+  set_req->group_name = "wheel";
+  set_req->position_name = mode;
+  set_req->status_name = "occupy";
+
+  auto set_future = state_manager_client_->async_send_request(set_req);
+  if (rclcpp::spin_until_future_complete(node_, set_future) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] Failed to call group_state_manager (set_group)");
+    return false;
+  }
+
+  auto set_resp = set_future.get();
+  if (!set_resp->success) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] set_group failed: %s", set_resp->message.c_str());
+    return false;
+  }
+
+  RCLCPP_INFO(node_->get_logger(),
+              "[WheelCommander] wheel reserved: mode=%s, status=occupy",
+              mode.c_str());
+  reserved_ = true;
+  return true;
+}
+
+// ============================================================================
+//  releaseWheel   (state management helper)
+// ============================================================================
+
+void WheelCommander::releaseWheel()
+{
+  if (!reserved_) {
+    return;  // not currently reserved
+  }
+
+  if (!state_manager_client_->wait_for_service(std::chrono::seconds(1))) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] group_state_manager service not available for release");
+    reserved_ = false;
+    return;
+  }
+
+  auto req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
+  req->command = "set_group";
+  req->group_name = "wheel";
+  req->position_name = "";  // leave position unchanged
+  req->status_name = "free";
+
+  auto future = state_manager_client_->async_send_request(req);
+  if (rclcpp::spin_until_future_complete(node_, future) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] Failed to release wheel state");
+  } else {
+    auto resp = future.get();
+    if (resp->success) {
+      RCLCPP_INFO(node_->get_logger(),
+                  "[WheelCommander] wheel released: status=free");
+    } else {
+      RCLCPP_ERROR(node_->get_logger(),
+                   "[WheelCommander] Release failed: %s", resp->message.c_str());
+    }
+  }
+
+  reserved_ = false;
+}
+
+// ============================================================================
 //  driveTurn
 // ============================================================================
 
 bool WheelCommander::driveTurn(double linear_speed, double duration)
 {
+  if (!reserveWheel("turn")) {
+    return false;
+  }
+
   const double angular_vel = linear_speed / WHEEL_RADIUS;
 
   RCLCPP_INFO(node_->get_logger(),
@@ -77,7 +202,9 @@ bool WheelCommander::driveTurn(double linear_speed, double duration)
     angular_vel,   // wheel_joint_2
     angular_vel    // wheel_joint_1
   };
-  return driveWithVelocities(velocities, duration);
+  bool ok = driveWithVelocities(velocities, duration);
+  releaseWheel();
+  return ok;
 }
 
 // ============================================================================
@@ -86,6 +213,10 @@ bool WheelCommander::driveTurn(double linear_speed, double duration)
 
 bool WheelCommander::driveForward(double linear_speed, double duration)
 {
+  if (!reserveWheel("forward")) {
+    return false;
+  }
+
   const double angular_vel = linear_speed / WHEEL_RADIUS;
 
   RCLCPP_INFO(node_->get_logger(),
@@ -99,7 +230,9 @@ bool WheelCommander::driveForward(double linear_speed, double duration)
     angular_vel,    // wheel_joint_2 (forward)
     angular_vel     // wheel_joint_1 (forward)
   };
-  return driveWithVelocities(velocities, duration);
+  bool ok = driveWithVelocities(velocities, duration);
+  releaseWheel();
+  return ok;
 }
 
 // ============================================================================

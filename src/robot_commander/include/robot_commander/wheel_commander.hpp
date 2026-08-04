@@ -4,6 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
+#include <robot_interfaces/srv/group_state_manager.hpp>
 #include <chrono>
 #include <map>
 #include <memory>
@@ -26,6 +27,12 @@ namespace robot_commander
  *
  * Linear speed (m/s) is converted internally to angular velocity (rad/s)
  * using the wheel radius (0.04 m).
+ *
+ * Each drive command forms a control loop with the /group_state_manager
+ * service: before publishing it reserves the "wheel" group (status must
+ * be "free", then set to "occupy" with the mode as position) and after
+ * the movement finishes it releases the group back to "free" (position
+ * unchanged).  If the wheel group is not free, the command is rejected.
  */
 class WheelCommander
 {
@@ -58,6 +65,10 @@ public:
 
   /**
    * @brief All 4 wheels rotate forward at the same linear speed.
+   *
+   * Reserves the "wheel" group via /group_state_manager (mode "turn")
+   * before moving and releases it after the movement completes.
+   *
    * @param linear_speed  Desired ground speed (m/s), default 0.1.
    * @param duration      Movement duration (seconds), default 1.0.
    * @return true on success.
@@ -67,6 +78,10 @@ public:
   /**
    * @brief Differential steering: wheel_joint_1,2 forward,
    *        wheel_joint_3,4 reverse.
+   *
+   * Reserves the "wheel" group via /group_state_manager (mode "forward")
+   * before moving and releases it after the movement completes.
+   *
    * @param linear_speed  Base linear speed (m/s), default 0.1.
    * @param duration      Movement duration (seconds), default 1.0.
    * @return true on success.
@@ -93,11 +108,33 @@ public:
   }
 
 private:
+  // -- state management helpers ------------------------------------------
+
+  /**
+   * @brief Reserve the wheel group via the group_state_manager service.
+   *
+   * Checks that the wheel status is "free", then sets it to "occupy"
+   * and records the requested mode as the current position.
+   *
+   * @param mode  The mode being requested ("forward", "turn").
+   * @return true if the wheel group was successfully reserved.
+   */
+  bool reserveWheel(const std::string & mode);
+
+  /**
+   * @brief Release the wheel group back to "free" status.
+   *
+   * The recorded position is left unchanged.
+   */
+  void releaseWheel();
+
   rclcpp::Node::SharedPtr node_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr velocity_pub_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_;
+  rclcpp::Client<robot_interfaces::srv::GroupStateManager>::SharedPtr state_manager_client_;
   std::map<std::string, double> current_positions_;
   std::string command_topic_;
+  bool reserved_ = false;
 };
 
 }  // namespace robot_commander

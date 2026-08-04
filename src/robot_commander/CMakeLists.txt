@@ -24,6 +24,7 @@ find_package(std_msgs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(example_interfaces REQUIRED)
 find_package(my_robot_interfaces REQUIRED)
+find_package(robot_interfaces REQUIRED)
 
 add_executable(test_moveit src/test_moveit.cpp)
 ament_target_dependencies(test_moveit rclcpp moveit_ros_planning_interface)
@@ -42,7 +43,7 @@ target_include_directories(wheel_commander_lib PUBLIC
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>"
 )
 ament_target_dependencies(wheel_commander_lib
-  rclcpp sensor_msgs std_msgs)
+  rclcpp sensor_msgs std_msgs robot_interfaces)
 target_link_options(wheel_commander_lib PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
 
 add_library(veer_commander_lib SHARED
@@ -53,7 +54,7 @@ target_include_directories(veer_commander_lib PUBLIC
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>"
 )
 ament_target_dependencies(veer_commander_lib
-  rclcpp rclcpp_action control_msgs sensor_msgs)
+  rclcpp rclcpp_action control_msgs sensor_msgs robot_interfaces)
 target_link_options(veer_commander_lib PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
 
 add_library(arm_commander_lib SHARED

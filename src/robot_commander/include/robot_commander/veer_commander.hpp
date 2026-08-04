@@ -5,6 +5,7 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <control_msgs/action/follow_joint_trajectory.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <robot_interfaces/srv/group_state_manager.hpp>
 #include <chrono>
 #include <map>
 #include <memory>
@@ -160,11 +161,33 @@ public:
   }
 
 private:
+  // -- state management helpers ------------------------------------------
+
+  /**
+   * @brief Reserve the veer group via the group_state_manager service.
+   *
+   * Checks that the veer status is "free", then sets it to "occupy"
+   * and records the requested mode as the current position.
+   *
+   * @param mode  The mode being requested ("home", "forward", "turn", "lift").
+   * @return true if the veer group was successfully reserved.
+   */
+  bool reserveVeer(const std::string & mode);
+
+  /**
+   * @brief Release the veer group back to "free" status.
+   *
+   * The recorded position is left unchanged.
+   */
+  void releaseVeer();
+
   rclcpp::Node::SharedPtr node_;
   rclcpp_action::Client<FollowJointTrajectory>::SharedPtr action_client_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_;
+  rclcpp::Client<robot_interfaces::srv::GroupStateManager>::SharedPtr state_manager_client_;
   std::map<std::string, double> current_positions_;
   std::string action_topic_;
+  bool reserved_ = false;
 };
 
 }  // namespace robot_commander
