@@ -154,6 +154,8 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 
 > **注意**：arm 各命名 preset（`home`/`low`/`high`/`rhombus_1`/`rhombus_2`）已移至
 > `CompoundCommander`（见第 4 节），`ArmCommander` 只保留低层轨迹发送接口。
+> **弃用**：该测试已不再单独使用。所有预设姿态均通过 `compound_commander_test`
+> 执行（见第 4 节），此文档仅保留以记录低层接口行为。
 
 运行命令：
 
@@ -203,8 +205,8 @@ arm 关节发送到 home（0 rad）。
 - 控制对象：**arm 部分**同第 3 节（16 个 arm 关节，经 `all_arms_controller` action）；
   **mobile_base 部分**为 4 个驱动轮（经 `/wheel_controller/commands` 速度控制）
 - 前置构型：veer 关节已处于 lift（-45°）构型（由 `veer_commander_test lift` 预先执行）
-- 各 preset 的 arm 目标均定义为相对初始状态的偏移量，先回 home 再施加偏移（两步运动）；
-  整个过程中四轮以 lift 模式半正弦速度剖面同步运行，实现机器人变形
+- 各 preset 的 arm 目标均定义为相对初始状态的偏移量，整个过程中四轮以 lift 模式
+  半正弦速度剖面同步运行，实现机器人变形
 
 运行命令：
 
@@ -242,33 +244,45 @@ ros2 run robot_commander compound_commander_test <mode> [duration]
 3. **执行后（释放）** — 调用 `set_group` 将 `arm`/`veer`/`wheel` 的 status 均重置为 `"free"`
    （position 保持不变）。
 
-#### 复合运动机制（arm + wheel lift 并发）
+#### 复合运动机制（arm + wheel lift 并发，双线程）
 
-arm 运动与 wheel lift 剖面**并发**执行，且 wheel lift 的总时长与整个 arm 操作的
-总时长严格一致（设总时长为 `T`）：
+arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动**设计，两者同时开始、
+各自独立运行，互不依赖时钟源：
 
-- **arm 侧**：经非阻塞接口 `asyncSendPositionGoal` / `asyncGetResult` 依次发送各步
-  轨迹 goal（单点轨迹，机制同第 3 节）；
-- **wheel 侧**：同一线程的循环中以 50 Hz（仿真时间）发布半正弦速度剖面
-  `w(t) = w_peak·sin(π·t/T)`，`t ∈ [0, T]`，其中峰值角速度
-  `w_peak = 0.1 / 0.04 = 2.5 rad/s`（峰值线速度 0.1 m/s）；
-- `T` 为全部 arm 步时长之和：`home` 为单步 `duration`；其余 mode 为
-  `回 home 步时长 + 偏移步时长`；
-- 到达 `T` 后立即发布全 0 速度停止；若 arm 结果超时（`T + 6 s` 宽限）未到，
-  则判定失败并停止四轮。
+| 组件 | 线程 | 时钟 | 控制方式 |
+|------|------|------|----------|
+| arm | 主线程 | 仿真时间（Gazebo `/clock`） | `sendPositionGoal` 阻塞（内用 `spin_until_future_complete`） |
+| wheel lift | 后台线程 | 墙钟（`std::chrono::steady_clock`） | 10 Hz 循环发布 `Float64MultiArray` 到 `/wheel_controller/commands` |
 
-#### 两步运动机制（偏移 preset）
+- **wheel 半正弦速度剖面**（`t ∈ [0, T]`）：
+  ```
+  w(t) = -w_peak · sin(π·t / T)
+  ```
+  其中峰值角速度 `w_peak = 0.1 / 0.04 = 2.5 rad/s`（峰值线速度 0.1 m/s），
+  负号表示轮的实际旋转方向与关节正方向相反（RViz 中实测修正）。
+- **T 的取值**：`T = total_duration × kSimDurationScale`，其中 `kSimDurationScale = 4.0`。
+  这是因为 Gazebo 中关节轨迹的实际执行时长总是约为请求时长的 **4 倍**
+  （实测：arm 1.0 s → 4.1 s，5.0 s → 20.4 s；veer 2.0 s → 8.0 s，一致约 4.08×），
+  因此 wheel 剖面也拉伸 4 倍，使两者同时结束。
+- **发布周期**：`kPeriod = 0.1 s`（10 Hz，即 5× sim 的 50 Hz），后台线程发布后
+  不阻塞。
+- 到达 `T` 后自动发布全 0 速度并退出线程；主线程通过 `join()` 等待后台线程结束。
 
-`low` / `high` / `rhombus_1` / `rhombus_2` 均执行两步运动，保证偏移始终相对初始（home）状态：
+#### 迁移机制（两步 → 一步）
+
+`low` / `high` / `rhombus_1` / `rhombus_2` 默认执行两步运动，保证偏移始终相对初始（home）状态：
 
 1. **第一步回 home（自动时长）**：所有关节回到 0 rad。时长按当前位移与速度限位
    自动计算：`max(最大位移 / 1.0, 1.0)` s。
 2. **第二步偏移运动**：目标位置 = home（0）+ 各 mode 偏移量，时长为 `max(duration, 2.0)` s
    （与 veer `forward` preset 相同的地板值，保证 Gazebo 物理下可靠收敛）。
 
+**优化**：若所有关节已处于 home 位置（`max_home_delta < 0.01 rad`），则跳过第一步回 home，
+直接发送单步偏移目标（此时 arm 仅被控制一次，避免 "arm controlled twice" 的冗余操作）。
+
 **home**
 - arm 目标位置向量（控制器顺序，16 维）：全 0
-- 单步执行，运动时长：`duration`（默认 3.0 s），wheel lift 剖面时长同为 `duration`
+- 单步执行，运动时长：`duration`（默认 3.0 s），wheel lift 剖面时长 `T = duration × 4.0`
 
 **low**
 - 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, -pi/4, +pi/2, -pi/4]`

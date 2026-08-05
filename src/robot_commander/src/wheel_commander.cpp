@@ -313,7 +313,7 @@ bool WheelCommander::driveWithLiftProfile(double peak_linear_speed, double durat
   }
 
   const double peak_omega = peak_linear_speed / WHEEL_RADIUS;
-  constexpr double kControlPeriod = 0.02;  // 50 Hz, in sim time
+  constexpr double kControlPeriod = 0.1;  // 10 Hz (5× sim Hz, in sim time)
 
   const auto start = node_->now();
   const auto deadline = start + rclcpp::Duration::from_seconds(duration);

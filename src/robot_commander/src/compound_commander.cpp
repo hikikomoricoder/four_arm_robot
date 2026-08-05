@@ -474,7 +474,7 @@ bool CompoundCommander::runWithWheelLift(
   // wall-clock seconds, then publishes zero and exits.  Uses
   // std::chrono::steady_clock — completely independent of sim time.
   std::thread wheel_thread([this, peak_omega, wheel_duration]() {
-    constexpr double kPeriod = 0.02;  // 50 Hz
+    constexpr double kPeriod = 0.1;  // 10 Hz (5× sim Hz, wall-clock)
     const auto start = std::chrono::steady_clock::now();
     auto last_publish = start;
 
