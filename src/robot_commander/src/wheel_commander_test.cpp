@@ -17,16 +17,18 @@ int main(int argc, char **argv)
   if (argc > 2) { linear_speed = std::stod(argv[2]); }
   if (argc > 3) { duration = std::stod(argv[3]); }
 
-  if (mode != "forward" && mode != "turn") {
+  if (mode != "forward" && mode != "turn" && mode != "lift") {
     fprintf(stderr,
             "Usage:  ros2 run robot_commander wheel_command <mode> [speed] [duration]\n"
-            "  mode     'forward' or 'turn' (required)\n"
-            "  speed     linear speed in m/s (default 0.1)\n"
+            "  mode     'forward', 'turn' or 'lift' (required)\n"
+            "  speed     linear speed in m/s (default 0.1; peak speed for 'lift')\n"
             "  duration  movement duration in seconds (default 1.0)\n"
             "\n"
             "  forward  wheel_joint_1,2 rotate forward,\n"
             "           wheel_joint_3,4 rotate in reverse\n"
-            "  turn     all four wheels rotate at the same speed\n");
+            "  turn     all four wheels rotate at the same speed\n"
+            "  lift     all four wheels follow a half-sine velocity\n"
+            "           profile w(t) = w_peak*sin(pi*t/duration)\n");
     return 1;
   }
 
@@ -44,8 +46,10 @@ int main(int argc, char **argv)
   bool ok = false;
   if (mode == "forward") {
     ok = commander.driveForward(linear_speed, duration);
-  } else {
+  } else if (mode == "turn") {
     ok = commander.driveTurn(linear_speed, duration);
+  } else {
+    ok = commander.driveLift(linear_speed, duration);
   }
 
   rclcpp::shutdown();

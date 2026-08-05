@@ -18,7 +18,7 @@ class StateManagerNode(Node):
     # ── Valid position values per group ───────────────────────────────
     _VALID_POSITIONS = {
         "veer":   frozenset({"home", "turn", "forward", "lift"}),
-        "wheel":  frozenset({"home", "turn", "forward"}),
+        "wheel":  frozenset({"home", "turn", "forward", "lift"}),
         "arm":    frozenset({"home", "low", "high", "rhombus_1", "rhombus_2",
                              "operate_1", "operate_2", "stabilize"}),
         "branch": frozenset({"home", "close"}),

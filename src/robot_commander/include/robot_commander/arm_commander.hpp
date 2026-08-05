@@ -6,6 +6,7 @@
 #include <control_msgs/action/follow_joint_trajectory.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <chrono>
+#include <future>
 #include <map>
 #include <memory>
 #include <string>
@@ -32,23 +33,28 @@ namespace robot_commander
  * independently while every preset keeps the 1/2 reverse relationship.
  *
  * At the home (initial) position every arm joint is at 0 rad (URDF zero).
- * All preset poses are defined as offsets relative to this initial state,
- * so they first return home and then apply the offset (two-step motion).
+ *
+ * This class is the low-level arm-motion layer: it only knows how to send
+ * trajectories to the arm controller.  The named preset poses (home, low,
+ * high, rhombus_1, rhombus_2) — which additionally coordinate the
+ * mobile_base (wheel lift mode) and the /group_state_manager state lock —
+ * live in CompoundCommander.
  *
  * Usage:
  *   auto node = std::make_shared<rclcpp::Node>(...);
  *   ArmCommander ac(node);
- *   ac.setHomeState();      // all 16 arm joints to 0
- *   ac.setLowState();       // arms down: j3 -45°, j5 +90°, j7 -45°
- *   ac.setHighState();      // arms up:   j3 +22.5°, j5 -45°, j7 +22.5°
- *   ac.setRhombus1State();  // diamond: j1 = +45°, -45°, +45°, -45°
- *   ac.setRhombus2State();  // diamond: j1 = -45°, +45°, -45°, +45°
+ *   ac.waitForJointStates();
+ *   ac.waitForActionServer();
+ *   ac.sendPositionGoal(ArmCommander::homePositions(), 3.0);  // all joints to 0
  */
 class ArmCommander
 {
 public:
   using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
   using GoalHandle = rclcpp_action::ClientGoalHandle<FollowJointTrajectory>;
+  using SendGoalFuture = std::shared_future<GoalHandle::SharedPtr>;
+  using WrappedResult = rclcpp_action::Client<FollowJointTrajectory>::WrappedResult;
+  using ResultFuture = std::shared_future<WrappedResult>;
 
   /**
    * @param node  A fully initialised rclcpp node (use_sim_time and other
@@ -77,96 +83,44 @@ public:
    */
   bool waitForActionServer(const std::chrono::seconds & timeout = std::chrono::seconds(5));
 
-  // -- arm preset commands -------------------------------------------------
+  // -- low-level API ------------------------------------------------------
 
   /**
-   * @brief Move all 16 arm joints back to the home (initial) position
-   *        (0 rad, URDF zero).
-   * @param duration  Movement duration (seconds), default 3.0.
-   * @return true if the trajectory completed successfully.
-   */
-  bool setHomeState(double duration = 3.0);
-
-  /**
-   * @brief "Low" preset — all four arms perform the same motion
-   *        relative to the initial state:
-   *          - arm_joint_3_x  -pi/4
-   *          - arm_joint_5_x  +pi/2
-   *          - arm_joint_7_x  -pi/4   (mimic of j5: -1/2 * (+pi/2))
-   *        arm_joint_1_x stays at 0.
-   *
-   * Two-step motion: 1) setHomeState (auto duration), 2) apply the offset
-   * (at least 2.0 s to converge reliably under Gazebo physics).
-   *
-   * @param duration  Desired movement duration for the offset step
-   *                  (seconds), default 3.0.
-   * @return true if the trajectory completed successfully.
-   */
-  bool setLowState(double duration = 3.0);
-
-  /**
-   * @brief "High" preset — all four arms perform the same motion
-   *        relative to the initial state:
-   *          - arm_joint_3_x  +pi/8
-   *          - arm_joint_5_x  -pi/4
-   *          - arm_joint_7_x  +pi/8   (mimic of j5: -1/2 * (-pi/4))
-   *        arm_joint_1_x stays at 0.
-   *
-   * Two-step motion: 1) setHomeState (auto duration), 2) apply the offset
-   * (at least 2.0 s to converge reliably under Gazebo physics).
-   *
-   * @param duration  Desired movement duration for the offset step
-   *                  (seconds), default 3.0.
-   * @return true if the trajectory completed successfully.
-   */
-  bool setHighState(double duration = 3.0);
-
-  /**
-   * @brief "Rhombus 1" preset — only arm_joint_1_x moves, forming a
-   *        diamond pattern relative to the initial state:
-   *          - arm_joint_1_1  +pi/4
-   *          - arm_joint_1_2  -pi/4
-   *          - arm_joint_1_3  +pi/4
-   *          - arm_joint_1_4  -pi/4
-   *        All other arm joints stay at 0.
-   *
-   * Two-step motion: 1) setHomeState (auto duration), 2) apply the offset
-   * (at least 2.0 s to converge reliably under Gazebo physics).
-   *
-   * @param duration  Desired movement duration for the offset step
-   *                  (seconds), default 3.0.
-   * @return true if the trajectory completed successfully.
-   */
-  bool setRhombus1State(double duration = 3.0);
-
-  /**
-   * @brief "Rhombus 2" preset — only arm_joint_1_x moves, forming the
-   *        opposite diamond pattern relative to the initial state:
-   *          - arm_joint_1_1  -pi/4
-   *          - arm_joint_1_2  +pi/4
-   *          - arm_joint_1_3  -pi/4
-   *          - arm_joint_1_4  +pi/4
-   *        All other arm joints stay at 0.
-   *
-   * Two-step motion: 1) setHomeState (auto duration), 2) apply the offset
-   * (at least 2.0 s to converge reliably under Gazebo physics).
-   *
-   * @param duration  Desired movement duration for the offset step
-   *                  (seconds), default 3.0.
-   * @return true if the trajectory completed successfully.
-   */
-  bool setRhombus2State(double duration = 3.0);
-
-  // -- low-level API (for advanced use) -----------------------------------
-
-  /**
-   * @brief Send a position goal for all 16 arm joints.
+   * @brief Send a position goal for all 16 arm joints and block until the
+   *        trajectory finishes.
    * @param positions  16-element vector in controller joint order
    *                   (see jointNames()).
    * @param duration   Movement duration (seconds).
    * @return true if the trajectory completed successfully.
    */
   bool sendPositionGoal(const std::vector<double> & positions, double duration);
+
+  /**
+   * @brief Validate and send a position goal for all 16 arm joints without
+   *        blocking.
+   *
+   * The returned future becomes ready once the controller answers the goal
+   * request; the caller is responsible for spinning the node in the
+   * meantime (e.g. via rclcpp::spin_some) and for waiting on the result
+   * with asyncGetResult().  This allows CompoundCommander to drive the
+   * wheel lift profile while the arm trajectory executes.
+   *
+   * @param positions  16-element vector in controller joint order.
+   * @param duration   Movement duration (seconds).
+   * @param goal_future  Output: the goal-handle future (only set when true
+   *                     is returned).
+   * @return true if the goal was sent, false on validation errors.
+   */
+  bool asyncSendPositionGoal(
+    const std::vector<double> & positions, double duration,
+    SendGoalFuture & goal_future);
+
+  /**
+   * @brief Request the result of an accepted goal without blocking.
+   * @param goal_handle  Goal handle obtained from the SendGoalFuture.
+   * @return Future for the wrapped result (poll it while spinning the node).
+   */
+  ResultFuture asyncGetResult(const GoalHandle::SharedPtr & goal_handle);
 
   /** Controller joint order (read-only) */
   static const std::vector<std::string> & jointNames()
@@ -186,17 +140,13 @@ public:
     return kHome;
   }
 
-private:
-  /**
-   * @brief Two-step motion helper: return home first (duration computed
-   *        from the URDF velocity limit and the current displacement),
-   *        then move to `offsets` relative to the home position.
-   * @param offsets   16-element offset vector in controller joint order.
-   * @param duration  Desired movement duration for the offset step.
-   * @return true if both trajectories completed successfully.
-   */
-  bool homeThenOffset(const std::vector<double> & offsets, double duration);
+  /** Latest positions received on /joint_states, keyed by joint name */
+  const std::map<std::string, double> & currentPositions() const
+  {
+    return current_positions_;
+  }
 
+private:
   rclcpp::Node::SharedPtr node_;
   rclcpp_action::Client<FollowJointTrajectory>::SharedPtr action_client_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_;

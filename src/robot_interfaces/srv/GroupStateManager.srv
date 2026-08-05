@@ -1,0 +1,29 @@
+# GroupStateManager Service
+#
+# Command interface for managing robot joint group states.
+#
+# Commands:
+#   get_all    - Get current state of all groups (group_name/position_name/status_name ignored)
+#   get_group  - Get state of a specific group (set group_name, position_name/status_name ignored)
+#   set_group  - Set position and/or status of a specific group (set group_name, and at least one of position_name/status_name)
+
+string command      # "get_all", "get_group", "set_group"
+string group_name   # "veer", "wheel", "arm", "branch" (empty for get_all)
+string position_name # target position value for set_group (e.g. "home", "turn", "forward")
+string status_name   # target status value for set_group (e.g. "free", "occupy")
+
+---
+bool   success
+string message      # status / error description
+
+# Current positions (populated on all commands)
+string veer_position
+string wheel_position
+string arm_position
+string branch_position
+
+# Current statuses (populated on all commands)
+string veer_status
+string wheel_status
+string arm_status
+string branch_status

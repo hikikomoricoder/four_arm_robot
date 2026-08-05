@@ -1,7 +1,8 @@
 # robot_commander 测试指令文档
 
-本文档记录 `wheel_commander_test.cpp`、`veer_commander_test.cpp` 与
-`arm_commander_test.cpp` 中各 `mode` 对应的关节控制目标（目标位置 / 运动速度）。
+本文档记录 `wheel_commander_test.cpp`、`veer_commander_test.cpp`、
+`arm_commander_test.cpp` 与 `compound_commander_test.cpp` 中各 `mode`
+对应的关节控制目标（目标位置 / 运动速度）。
 
 ---
 
@@ -84,8 +85,8 @@ ros2 run robot_commander veer_commander_test <mode> [duration]
 
 ```bash
 ros2 run robot_commander wheel_command <mode> [speed] [duration]
-#   mode      'forward' | 'turn'
-#   speed     线速度（m/s），默认 0.1
+#   mode      'forward' | 'turn' | 'lift'
+#   speed     线速度（m/s），默认 0.1（lift 模式为峰值线速度）
 #   duration  运动时长（秒），默认 1.0
 ```
 
@@ -95,6 +96,7 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 |------|----------|------------------------|------|
 | `forward` | `driveForward(speed, duration)` | j1=`+w`, j2=`+w`, j3=`-w`, j4=`-w` | 差速前进：1,2 正转，3,4 反转 |
 | `turn` | `driveTurn(speed, duration)` | j1=`+w`, j2=`+w`, j3=`+w`, j4=`+w` | 所有轮同向同速转动 |
+| `lift` | `driveLift(speed, duration)` | 四轮相同：`w(t)=w·sin(π·t/duration)` | 半正弦速度剖面，50 Hz 发布，起止速度为 0 |
 
 ### 各 mode 细节
 
@@ -103,7 +105,7 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 每个 `mode` 在发布速度命令（`driveWithVelocities`）前后会向 `/group_state_manager` service 发送请求，形成控制闭环：
 
 1. **执行前** — 调用 `get_group` 查询 `wheel` 组的 `status`：
-   - 若为 `"free"`，则调用 `set_group` 将 `status` 设为 `"occupy"`、`position` 设为对应的 mode 名（`forward`/`turn`）。
+   - 若为 `"free"`，则调用 `set_group` 将 `status` 设为 `"occupy"`、`position` 设为对应的 mode 名（`forward`/`turn`/`lift`）。
    - 若不为 `"free"`，则拒绝执行并返回 `false`（不会发布任何速度命令）。
 2. **执行后** — 调用 `set_group` 将 `status` 重置为 `"free"`（`position` 保持不变）。
 
@@ -120,9 +122,18 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
   - 四个轮均为 `+w`（同向同速）
 - 持续 `duration` 后停止（发布 `[0, 0, 0, 0]`）
 
+**lift**
+- 半正弦速度剖面：`w(t) = w·sin(π·t/duration)`，`t ∈ [0, duration]`
+  - 四个轮任意时刻速度相同（控制器顺序 `[j4, j3, j2, j1]`：`[w(t), w(t), w(t), w(t)]`）
+  - `t=0` 与 `t=duration` 时速度为 0，`t=duration/2` 时达到峰值 `w`
+  - 以 50 Hz（仿真时间）周期发布，由 `driveWithLiftProfile` 实现
+- 用于 veer 处于 lift（-45°）构型时的底盘变形过程；持续 `duration` 后停止
+- 低层接口 `publishLiftVelocity(ω)` 可立即向四轮发布同一角速度，供
+  `CompoundCommander` 在 arm 轨迹执行期间同步驱动 lift 剖面使用
+
 ---
 
-## 3. arm_commander_test.cpp（机械臂组，位置控制）
+## 3. arm_commander_test.cpp（机械臂组，低层位置控制）
 
 - 控制对象：4 个机械臂共 16 个关节（`arm_joint_1_x / 3_x / 5_x / 7_x`，x = 1~4，四臂主体结构完全相同）
 - 控制方式：位置控制，通过 `all_arms_controller`
@@ -140,17 +151,70 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
    arm_joint_1_4, arm_joint_3_4, arm_joint_5_4, arm_joint_7_4]   // 臂 4
   ```
 - Home（初始）位置：所有关节 `0 rad`（URDF 零位）
-- 各 preset 目标均定义为相对初始状态的偏移量，先回 home 再施加偏移（两步运动）
+
+> **注意**：arm 各命名 preset（`home`/`low`/`high`/`rhombus_1`/`rhombus_2`）已移至
+> `CompoundCommander`（见第 4 节），`ArmCommander` 只保留低层轨迹发送接口。
 
 运行命令：
 
 ```bash
-ros2 run robot_commander arm_commander_test <mode> [duration]
+ros2 run robot_commander arm_commander_test [duration]
+#   duration  运动时长（秒），默认 3.0
+```
+
+低层烟雾测试：通过 `sendPositionGoal(homePositions(), duration)` 将全部 16 个
+arm 关节发送到 home（0 rad）。
+
+### 低层接口说明
+
+#### 执行前置流程
+
+每次运行先阻塞等待两个就绪条件（超时均为 5 s）：
+
+1. `waitForJointStates()` — 在 `/joint_states` 上收齐全部 16 个 arm 关节的当前角度。
+2. `waitForActionServer()` — `all_arms_controller` 的 action server 可用。
+
+就绪后调用 `sendPositionGoal`；发送前还会校验 16 维目标向量
+是否超出 URDF 限位（越限仅打印 WARN，不阻止发送）。
+
+#### 匀速同步到达机制（sendPositionGoal）
+
+每次调用生成单点轨迹发送给控制器：
+
+- 每关节速度按 `v_i = (目标_i - 当前_i) / duration` 写入 `point.velocities`，
+  即各关节在 `duration` 内**匀速**运动并在**同一时刻**到达目标位置；
+- 位移越大速度越快（速度与位移成正比）；
+- `time_from_start = duration`，`goal_time_tolerance = duration + 3.0` s。
+
+#### 非阻塞接口（供 CompoundCommander 使用）
+
+- `asyncSendPositionGoal(positions, duration, goal_future)` — 校验并发送 goal 后立即返回，
+  不阻塞等待；调用方自行 spin 节点并轮询返回的 future。
+- `asyncGetResult(goal_handle)` — 非阻塞请求执行结果，返回可轮询的 future。
+- `currentPositions()` — 返回 `/joint_states` 上最新的关节位置表（只读）。
+
+> 与 veer / wheel 相同：arm 低层接口**不参与** `/group_state_manager` 的
+> occupy/free 状态锁定闭环（状态锁定由 `CompoundCommander` 统一执行）。
+
+---
+
+## 4. compound_commander_test.cpp（机械臂 + 移动底盘复合预设）
+
+- 控制对象：**arm 部分**同第 3 节（16 个 arm 关节，经 `all_arms_controller` action）；
+  **mobile_base 部分**为 4 个驱动轮（经 `/wheel_controller/commands` 速度控制）
+- 前置构型：veer 关节已处于 lift（-45°）构型（由 `veer_commander_test lift` 预先执行）
+- 各 preset 的 arm 目标均定义为相对初始状态的偏移量，先回 home 再施加偏移（两步运动）；
+  整个过程中四轮以 lift 模式半正弦速度剖面同步运行，实现机器人变形
+
+运行命令：
+
+```bash
+ros2 run robot_commander compound_commander_test <mode> [duration]
 #   mode      'home' | 'low' | 'high' | 'rhombus_1' | 'rhombus_2'
 #   duration  运动时长（秒），默认 3.0
 ```
 
-| mode | 调用函数 | 各关节目标位置（rad） | 说明 |
+| mode | 调用函数 | arm 各关节目标位置（rad） | 说明 |
 |------|----------|------------------------|------|
 | `home` | `setHomeState(duration)` | 全部 16 关节 = 0 | 所有关节回到 URDF 零位（单步，无偏移） |
 | `low` | `setLowState(duration)` | 每臂：j1=0, j3=`-pi/4`, j5=`+pi/2`, j7=`-pi/4` | 四臂同动作；j7 为 j5 的 `-1/2` mimic |
@@ -160,43 +224,51 @@ ros2 run robot_commander arm_commander_test <mode> [duration]
 
 ### 各 mode 细节
 
-#### 执行前置流程
+#### 状态管理控制闭环
 
-每次运行先阻塞等待两个就绪条件（超时均为 5 s）：
+每个 `mode` 在执行前后会向 `/group_state_manager` service 发送请求，形成控制闭环：
 
-1. `waitForJointStates()` — 在 `/joint_states` 上收齐全部 16 个 arm 关节的当前角度。
-2. `waitForActionServer()` — `all_arms_controller` 的 action server 可用。
+1. **执行前（前置检查）** — 调用 `get_all` 查询全部组状态，仅当以下条件**全部满足**才执行：
+   - `arm` status 为 `"free"`
+   - `veer` position 为 `"lift"`
+   - `veer` status 为 `"free"`
+   - `wheel` status 为 `"free"`
+   任一不满足则拒绝执行并返回 `false`（不发送任何运动命令）。
+2. **开始执行（锁定）** — 依次调用 `set_group`：
+   - `arm`：position = 目标 mode 名（`home`/`low`/`high`/`rhombus_1`/`rhombus_2`），status = `"occupy"`
+   - `veer`：status = `"occupy"`（position 保持 `"lift"` 不变）
+   - `wheel`：position = `"lift"`，status = `"occupy"`
+   任一步失败则回滚已锁定的组（恢复为 `"free"`）。
+3. **执行后（释放）** — 调用 `set_group` 将 `arm`/`veer`/`wheel` 的 status 均重置为 `"free"`
+   （position 保持不变）。
 
-就绪后按 mode 调用对应 preset 函数；`sendPositionGoal` 发送前还会校验 16 维目标向量
-是否超出 URDF 限位（越限仅打印 WARN，不阻止发送）。
+#### 复合运动机制（arm + wheel lift 并发）
 
-#### 两步运动机制（homeThenOffset）
+arm 运动与 wheel lift 剖面**并发**执行，且 wheel lift 的总时长与整个 arm 操作的
+总时长严格一致（设总时长为 `T`）：
 
-`low` / `high` / `rhombus_1` / `rhombus_2` 均通过 `homeThenOffset` 执行两步运动，
-保证偏移始终相对初始（home）状态：
+- **arm 侧**：经非阻塞接口 `asyncSendPositionGoal` / `asyncGetResult` 依次发送各步
+  轨迹 goal（单点轨迹，机制同第 3 节）；
+- **wheel 侧**：同一线程的循环中以 50 Hz（仿真时间）发布半正弦速度剖面
+  `w(t) = w_peak·sin(π·t/T)`，`t ∈ [0, T]`，其中峰值角速度
+  `w_peak = 0.1 / 0.04 = 2.5 rad/s`（峰值线速度 0.1 m/s）；
+- `T` 为全部 arm 步时长之和：`home` 为单步 `duration`；其余 mode 为
+  `回 home 步时长 + 偏移步时长`；
+- 到达 `T` 后立即发布全 0 速度停止；若 arm 结果超时（`T + 6 s` 宽限）未到，
+  则判定失败并停止四轮。
 
-1. **第一步 setHomeState（自动时长）**：所有关节回到 0 rad。时长按当前位移与速度限位
+#### 两步运动机制（偏移 preset）
+
+`low` / `high` / `rhombus_1` / `rhombus_2` 均执行两步运动，保证偏移始终相对初始（home）状态：
+
+1. **第一步回 home（自动时长）**：所有关节回到 0 rad。时长按当前位移与速度限位
    自动计算：`max(最大位移 / 1.0, 1.0)` s。
 2. **第二步偏移运动**：目标位置 = home（0）+ 各 mode 偏移量，时长为 `max(duration, 2.0)` s
-   （`kMinOffsetDuration`，与 veer `forward` preset 相同的地板值，保证 Gazebo 物理下可靠收敛）。
-
-#### 匀速同步到达机制（sendPositionGoal）
-
-每个 mode 最终生成单点轨迹发送给控制器：
-
-- 每关节速度按 `v_i = (目标_i - 当前_i) / duration` 写入 `point.velocities`，
-  即各关节在 `duration` 内**匀速**运动并在**同一时刻**到达目标位置；
-- 位移越大速度越快（速度与位移成正比），例如 `low` 中 `arm_joint_5_x`（位移 `+pi/2`）
-  的速度是 `arm_joint_3_x`（位移 `-pi/4`）的 2 倍——即结构限制下保证
-  "各 joint 同时到达、过程均速"的转动速度倍率关系；
-- `time_from_start = duration`，`goal_time_tolerance = duration + 3.0` s。
-
-> 与 veer / wheel 不同：arm 各 mode **不参与** `/group_state_manager` 的
-> occupy/free 状态锁定闭环，直接通过 action 发送轨迹。
+   （与 veer `forward` preset 相同的地板值，保证 Gazebo 物理下可靠收敛）。
 
 **home**
-- 目标位置向量（控制器顺序，16 维）：全 0
-- 单步执行（不走 homeThenOffset），运动时长：`duration`（默认 3.0 s）
+- arm 目标位置向量（控制器顺序，16 维）：全 0
+- 单步执行，运动时长：`duration`（默认 3.0 s），wheel lift 剖面时长同为 `duration`
 
 **low**
 - 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, -pi/4, +pi/2, -pi/4]`

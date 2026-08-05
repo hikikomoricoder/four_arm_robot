@@ -68,6 +68,27 @@ ament_target_dependencies(arm_commander_lib
   rclcpp rclcpp_action control_msgs sensor_msgs)
 target_link_options(arm_commander_lib PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
 
+add_library(compound_commander_lib SHARED
+  src/compound_commander.cpp
+)
+target_include_directories(compound_commander_lib PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>"
+)
+ament_target_dependencies(compound_commander_lib
+  rclcpp rclcpp_action control_msgs sensor_msgs std_msgs robot_interfaces)
+# Plain signature to stay compatible with ament_target_dependencies above.
+target_link_libraries(compound_commander_lib
+  arm_commander_lib wheel_commander_lib)
+# compound_commander_lib links arm_commander_lib / wheel_commander_lib, which
+# are installed next to it in lib/${PROJECT_NAME}/.  RUNPATH is not
+# transitive, so the executables' $ORIGIN entry alone cannot resolve those
+# sibling libraries — the library needs its own $ORIGIN RPATH.
+set_target_properties(compound_commander_lib PROPERTIES
+  INSTALL_RPATH "\$ORIGIN"
+)
+target_link_options(compound_commander_lib PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
+
 # ── Executable ────────────────────────────────────────────────────
 add_executable(wheel_commander_test
   src/wheel_commander_test.cpp
@@ -108,15 +129,28 @@ set_target_properties(arm_commander_test PROPERTIES
 )
 target_link_options(arm_commander_test PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
 
+add_executable(compound_commander_test
+  src/compound_commander_test.cpp
+)
+ament_target_dependencies(compound_commander_test
+  rclcpp rclcpp_action control_msgs sensor_msgs std_msgs)
+target_link_libraries(compound_commander_test compound_commander_lib)
+set_target_properties(compound_commander_test PROPERTIES
+  INSTALL_RPATH "\$ORIGIN"
+)
+target_link_options(compound_commander_test PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
+
 # ── Install ────────────────────────────────────────────────────────
 install(TARGETS
   wheel_commander_lib
   veer_commander_lib
   arm_commander_lib
+  compound_commander_lib
   test_moveit
   wheel_commander_test
   veer_commander_test
   arm_commander_test
+  compound_commander_test
   EXPORT ${PROJECT_NAME}Targets
   DESTINATION lib/${PROJECT_NAME}/
 )
