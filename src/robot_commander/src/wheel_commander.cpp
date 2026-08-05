@@ -236,26 +236,6 @@ bool WheelCommander::driveForward(double linear_speed, double duration)
 }
 
 // ============================================================================
-//  driveLift
-// ============================================================================
-
-bool WheelCommander::driveLift(double peak_linear_speed, double duration)
-{
-  if (!reserveWheel("lift")) {
-    return false;
-  }
-
-  RCLCPP_INFO(node_->get_logger(),
-              "[WheelCommander] driveLift: half-sine profile, peak %.3f rad/s "
-              "(%.3f m/s) over %.1f s",
-              peak_linear_speed / WHEEL_RADIUS, peak_linear_speed, duration);
-
-  bool ok = driveWithLiftProfile(peak_linear_speed, duration);
-  releaseWheel();
-  return ok;
-}
-
-// ============================================================================
 //  driveWithVelocities  (core implementation)
 // ============================================================================
 
@@ -293,49 +273,6 @@ bool WheelCommander::driveWithVelocities(const std::vector<double> & velocities,
   std::fill(msg.data.begin(), msg.data.end(), 0.0);
   velocity_pub_->publish(msg);
   RCLCPP_INFO(node_->get_logger(), "[WheelCommander] Stopped");
-
-  return rclcpp::ok();
-}
-
-// ============================================================================
-//  driveWithLiftProfile  (low-level lift implementation)
-// ============================================================================
-
-bool WheelCommander::driveWithLiftProfile(double peak_linear_speed, double duration)
-{
-  if (!rclcpp::ok()) {
-    return false;
-  }
-  if (duration <= 0.0) {
-    RCLCPP_ERROR(node_->get_logger(),
-                 "[WheelCommander] driveWithLiftProfile: duration must be positive");
-    return false;
-  }
-
-  const double peak_omega = peak_linear_speed / WHEEL_RADIUS;
-  constexpr double kControlPeriod = 0.1;  // 10 Hz (5× sim Hz, in sim time)
-
-  const auto start = node_->now();
-  const auto deadline = start + rclcpp::Duration::from_seconds(duration);
-  auto last_publish = start - rclcpp::Duration::from_seconds(kControlPeriod);
-
-  // Half-sine velocity profile: w(t) = peak_omega * sin(pi * t / duration).
-  // Starts and ends at 0 rad/s, peaks halfway through the motion.
-  while (rclcpp::ok() && node_->now() < deadline) {
-    rclcpp::spin_some(node_);
-    const auto now = node_->now();
-    if ((now - last_publish).seconds() >= kControlPeriod) {
-      const double t = (now - start).seconds();
-      // Negative sign: wheel rotation direction observed in RViz is
-      // opposite to the joint's positive direction.
-      publishLiftVelocity(-peak_omega * std::sin(M_PI * t / duration));
-      last_publish = now;
-    }
-  }
-
-  // Stop (publish zero velocities)
-  publishLiftVelocity(0.0);
-  RCLCPP_INFO(node_->get_logger(), "[WheelCommander] Lift profile finished, stopped");
 
   return rclcpp::ok();
 }

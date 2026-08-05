@@ -24,7 +24,6 @@ namespace robot_commander
  *   WheelCommander wc(node);
  *   wc.driveForward(0.1, 1.0);        // differential forward
  *   wc.driveTurn(0.1, 1.0);           // all wheels forward
- *   wc.driveLift(0.1, 3.0);           // lift mode (sinusoidal profile)
  *
  * Linear speed (m/s) is converted internally to angular velocity (rad/s)
  * using the wheel radius (0.04 m).
@@ -89,24 +88,6 @@ public:
    */
   bool driveForward(double linear_speed = 0.1, double duration = 1.0);
 
-  /**
-   * @brief Lift mode: all 4 wheels follow a half-sine velocity profile
-   *        w(t) = w_peak * sin(pi * t / duration), t in [0, duration].
-   *
-   * The velocity starts and ends at 0 and peaks (w_peak) halfway through,
-   * giving a smooth deformation motion while the veer joints hold the
-   * lift angle (-45°).  Intended to run for the same duration as a
-   * simultaneous arm operation (see CompoundCommander).
-   *
-   * Reserves the "wheel" group via /group_state_manager (mode "lift")
-   * before moving and releases it after the movement completes.
-   *
-   * @param peak_linear_speed  Peak linear speed (m/s), default 0.1.
-   * @param duration           Movement duration (seconds), default 3.0.
-   * @return true on success.
-   */
-  bool driveLift(double peak_linear_speed = 0.1, double duration = 3.0);
-
   // -- low-level API (for advanced use) -----------------------------------
 
   /**
@@ -117,21 +98,6 @@ public:
    * @return true on success.
    */
   bool driveWithVelocities(const std::vector<double> & velocities, double duration);
-
-  /**
-   * @brief Low-level lift profile: publish the half-sine velocity profile
-   *        w(t) = (peak_linear_speed / WHEEL_RADIUS) * sin(pi * t / duration)
-   *        to all four wheels at 50 Hz (sim time) for `duration`, then stop.
-   *
-   * Does NOT touch the /group_state_manager state lock — use driveLift()
-   * for standalone operation, or call this from CompoundCommander which
-   * manages the state lock itself.
-   *
-   * @param peak_linear_speed  Peak linear speed (m/s).
-   * @param duration           Movement duration (seconds).
-   * @return true on success.
-   */
-  bool driveWithLiftProfile(double peak_linear_speed, double duration);
 
   /**
    * @brief Publish the same angular velocity to all four wheels immediately

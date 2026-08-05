@@ -85,8 +85,8 @@ ros2 run robot_commander veer_commander_test <mode> [duration]
 
 ```bash
 ros2 run robot_commander wheel_command <mode> [speed] [duration]
-#   mode      'forward' | 'turn' | 'lift'
-#   speed     线速度（m/s），默认 0.1（lift 模式为峰值线速度）
+#   mode      'forward' | 'turn'
+#   speed     线速度（m/s），默认 0.1
 #   duration  运动时长（秒），默认 1.0
 ```
 
@@ -96,7 +96,6 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 |------|----------|------------------------|------|
 | `forward` | `driveForward(speed, duration)` | j1=`+w`, j2=`+w`, j3=`-w`, j4=`-w` | 差速前进：1,2 正转，3,4 反转 |
 | `turn` | `driveTurn(speed, duration)` | j1=`+w`, j2=`+w`, j3=`+w`, j4=`+w` | 所有轮同向同速转动 |
-| `lift` | `driveLift(speed, duration)` | 四轮相同：`w(t)=w·sin(π·t/duration)` | 半正弦速度剖面，50 Hz 发布，起止速度为 0 |
 
 ### 各 mode 细节
 
@@ -105,7 +104,7 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 每个 `mode` 在发布速度命令（`driveWithVelocities`）前后会向 `/group_state_manager` service 发送请求，形成控制闭环：
 
 1. **执行前** — 调用 `get_group` 查询 `wheel` 组的 `status`：
-   - 若为 `"free"`，则调用 `set_group` 将 `status` 设为 `"occupy"`、`position` 设为对应的 mode 名（`forward`/`turn`/`lift`）。
+   - 若为 `"free"`，则调用 `set_group` 将 `status` 设为 `"occupy"`、`position` 设为对应的 mode 名（`forward`/`turn`）。
    - 若不为 `"free"`，则拒绝执行并返回 `false`（不会发布任何速度命令）。
 2. **执行后** — 调用 `set_group` 将 `status` 重置为 `"free"`（`position` 保持不变）。
 
@@ -121,15 +120,6 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 - 发布速度向量（控制器顺序 `[j4, j3, j2, j1]`）：`[+w, +w, +w, +w]`
   - 四个轮均为 `+w`（同向同速）
 - 持续 `duration` 后停止（发布 `[0, 0, 0, 0]`）
-
-**lift**
-- 半正弦速度剖面：`w(t) = w·sin(π·t/duration)`，`t ∈ [0, duration]`
-  - 四个轮任意时刻速度相同（控制器顺序 `[j4, j3, j2, j1]`：`[w(t), w(t), w(t), w(t)]`）
-  - `t=0` 与 `t=duration` 时速度为 0，`t=duration/2` 时达到峰值 `w`
-  - 以 50 Hz（仿真时间）周期发布，由 `driveWithLiftProfile` 实现
-- 用于 veer 处于 lift（-45°）构型时的底盘变形过程；持续 `duration` 后停止
-- 低层接口 `publishLiftVelocity(ω)` 可立即向四轮发布同一角速度，供
-  `CompoundCommander` 在 arm 轨迹执行期间同步驱动 lift 剖面使用
 
 ---
 
