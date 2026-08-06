@@ -156,7 +156,7 @@
                 <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
             </collision>
             <xacro:cylinder_inertia m="2.0" r="${arm_joint_4_radius}" l="${arm_joint_4_length}"
-                                o_xyz="0 0 0" o_rpy="${pi / 4.0} 0 0"/>
+                                o_xyz="0 0 0" o_rpy="${pi / 2.0} 0 0"/>
         </link>
     </xacro:macro>
 
@@ -227,7 +227,7 @@
             <origin xyz="0 0 ${arm_base_height/2}" rpy="0 0 ${pi / 2.0}" />
             <axis xyz="0 0 1" />
             <limit lower="-3.14" upper="3.14" effort="100" velocity="100" />
-            <dynamics friction="100.0" damping="0.3" />
+            <dynamics friction="0.1" damping="0.1" />
         </joint>
     </xacro:macro>
 
@@ -246,7 +246,7 @@
             <origin xyz="0 0 ${arm_link_1_height+arm_joint_2_radius}" rpy="0 -${pi / 4.0} 0" />
             <axis xyz="0 1 0" />
             <limit lower="-2.35" upper="2.35" effort="100" velocity="100" />
-            <dynamics friction="100.0" damping="0.3" />
+            <dynamics friction="0.1" damping="0.1" />
         </joint>
     </xacro:macro>
 
@@ -265,7 +265,7 @@
             <origin xyz="0 0 ${arm_link_2_height+arm_joint_2_radius+arm_joint_3_radius}" rpy="0 -${pi / 2.0} 0" />
             <axis xyz="0 1 0" />
             <limit lower="-2.35" upper="2.35" effort="100" velocity="100" />
-            <dynamics friction="100.0" damping="0.3" />
+            <dynamics friction="0.1" damping="0.1" />
         </joint>
     </xacro:macro>
 
@@ -284,7 +284,7 @@
             <origin xyz="0 0 ${arm_link_2_height+arm_joint_2_radius+arm_joint_1_radius}" rpy="0 -${pi / 4.0} 0" />
             <axis xyz="0 1 0" />
             <limit lower="-2.35" upper="2.35" effort="100" velocity="100" />
-            <dynamics friction="100.0" damping="0.3" />
+            <dynamics friction="0.1" damping="0.1" />
         </joint>
     </xacro:macro>
 
