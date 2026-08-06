@@ -30,6 +30,10 @@ namespace robot_commander
  *        - veer  position == "lift"
  *        - veer  status   == "free"
  *        - wheel status   == "free"
+ *      plus, for the offset presets (low/high/rhombus_*):
+ *        - arm   position == "home"
+ *      For the home preset the current arm position is read instead and
+ *      selects the wheel scheme for the trip back home (table lookup).
  *      Otherwise the command is rejected and nothing moves.
  *   2. Reserve (set_group):
  *        - arm   position = target preset, status = "occupy"
@@ -89,6 +93,14 @@ public:
   /**
    * @brief "Home" preset — all 16 arm joints back to 0 rad (single step),
    *        with the wheel lift profile running for the same duration.
+   *
+   * The pre-check (get_all) additionally reads the current arm position;
+   * the wheel scheme for the trip back home is a TABLE LOOKUP keyed by it
+   * (the reverse of the home -> preset distance): "low" -> -0.1816 m
+   * (exactly the reversed velocity curve of home -> low, fully tested),
+   * "high" -> +0.2011 m, "home" / "rhombus_*" (and untracked positions)
+   * -> 0, wheels stay still.  The other return trips are not yet tested.
+   *
    * @param duration  Movement duration (seconds), default 3.0.
    * @return true if the compound motion completed successfully.
    */
@@ -139,7 +151,9 @@ public:
    *        the change of the adjacent arm-base separation, computed from
    *        the URDF geometry (see commander.md section 4).  Positive =
    *        bases spread apart (home -> low); negative = bases contract
-   *        (home -> high); 0 for home / rhombus presets.
+   *        (home -> high); 0 for home / rhombus presets.  The reverse trip
+   *        (preset -> home) uses the negated entry of this table, keyed
+   *        by the state-manager arm position (see setHomeState).
    * @return 0.0 for unknown preset names.
    */
   double presetLiftDistance(const std::string & preset) const;
@@ -155,11 +169,22 @@ private:
   // -- state management helpers ------------------------------------------
 
   /**
-   * @brief Pre-check via /group_state_manager (get_all): arm status "free",
-   *        veer position "lift", veer status "free", wheel status "free".
-   * @return true if a compound preset may execute.
+   * @brief Pre-check via /group_state_manager (get_all) for the offset
+   *        presets: arm status "free", arm position "home", veer position
+   *        "lift", veer status "free", wheel status "free".
+   * @return true if an offset preset (low/high/rhombus_*) may execute.
    */
   bool checkPreconditions();
+
+  /**
+   * @brief Pre-check via /group_state_manager (get_all) and return the
+   *        current arm position: arm status "free", veer position "lift",
+   *        veer status "free", wheel status "free" (the arm position
+   *        itself is not constrained).
+   * @return Current arm position name, or "" when any precondition fails
+   *         or the service call failed.
+   */
+  std::string queryArmPosition();
 
   /**
    * @brief Reserve the arm / veer / wheel groups for a preset:
@@ -198,6 +223,18 @@ private:
   bool buildOffsetSteps(
     const std::vector<double> & offsets, double duration,
     std::vector<ArmStep> & steps);
+
+  /**
+   * @brief Evaluate the current adjacent arm-base separation L(q3, q5)
+   *        from the latest /joint_states data (q3/q5 averaged over the
+   *        four arms).  Currently unused by the presets (the home trip is
+   *        a table lookup); kept for a future "force return to home" mode
+   *        that must work regardless of the recorded state.
+   * @param separation  Output: current base separation (m), only valid
+   *                    when true is returned.
+   * @return false if no joint state data is available yet.
+   */
+  bool currentBaseSeparation(double & separation) const;
 
   /**
    * @brief Run the arm steps while concurrently driving the wheel lift

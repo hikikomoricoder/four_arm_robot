@@ -227,6 +227,10 @@ ros2 run robot_commander compound_commander_test <mode> [duration]
    - `veer` position 为 `"lift"`
    - `veer` status 为 `"free"`
    - `wheel` status 为 `"free"`
+   - **除 `home` 外的各 preset**（`low`/`high`/`rhombus_1`/`rhombus_2`）额外要求
+     `arm` position 为 `"home"`（偏移目标均相对 home 定义，必须从 home 出发）。
+   - **`home` preset**：不限制 arm position，而是**读取当前 `arm` position**，
+     据此查表选择回程 wheel 方案（见下文 “回程” 小节）。
    任一不满足则拒绝执行并返回 `false`（不发送任何运动命令）。
 2. **开始执行（锁定）** — 依次调用 `set_group`：
    - `arm`：position = 目标 mode 名（`home`/`low`/`high`/`rhombus_1`/`rhombus_2`），status = `"occupy"`
@@ -305,11 +309,11 @@ L(q3, q5) = 0.05 + 0.31·sin(π/4 − q3) + 0.31·sin(3π/4 − q3 − q5)
 
 **3. 各 preset 的间距与总运动距离（相对 home）**
 
-| preset | (q3, q5) | L（m） | wheel 运动距离 d = L − L_home（m） | 方向 |
+| preset | (q3, q5) | L（m） | wheel 运动距离 d（m） | 方向 |
 |--------|----------|--------|------------------------|------|
-| home | (0, 0) | 0.05 + 0.31·√2 ≈ **0.4884** | 0（轮静止） | — |
-| low | (−π/4, +π/2) | 0.05 + 0.31 + 0.31 = **0.67** | **+0.1816** | base 外扩 |
-| high | (+π/8, −π/4) | 0.05 + 2·0.31·sin(π/8) ≈ **0.2873** | **−0.2011** | base 内收 |
+| home | (0, 0) | 0.05 + 0.31·√2 ≈ **0.4884** | 查表（按状态管理器 arm position 取反：low→home = **−0.1816**，曲线反向；high→home = **+0.2011**；home/rhombus→home = 0，轮静止） | 视当前构型 |
+| low | (−π/4, +π/2) | 0.05 + 0.31 + 0.31 = **0.67** | **+0.1816**（home→low） | base 外扩 |
+| high | (+π/8, −π/4) | 0.05 + 2·0.31·sin(π/8) ≈ **0.2873** | **−0.2011**（home→high） | base 内收 |
 | rhombus_1 / rhombus_2 | — | 不变（仅 `arm_joint_1` 竖轴转动） | 0（轮静止） | — |
 
 **home → low 总运动距离**：
@@ -326,6 +330,16 @@ d = |L_low − L_home| = 0.67 − 0.4884 = 0.1816 m
 - 数值例：home → low、默认 `duration = 3.0` s（home 出发为单步，T = 3.0 s）：
   `v_peak = π × 0.1816 / (2 × 3.0) ≈ 0.095 m/s`，`w_peak ≈ 2.38 rad/s`
   （旧版硬编码 0.1 m/s / 2.5 rad/s 与上述结构距离不一致，已替换）。
+- **回程（preset → home，查表）**：`setHomeState` 执行前先经 `get_all` 读取
+  状态管理器记录的 `arm` position，回程距离 = 该 preset 去程距离的**相反数**
+  （查 `preset_lift_distance_` 表取反，不读关节状态）：
+  - low → home：`d = −0.1816 m` → `sign = +1`，速度曲线与 home → low
+    **完全反向**，滚回相同距离（已验证）；
+  - high → home：`d = +0.2011 m` → `sign = −1`（未开发测试完）；
+  - home / rhombus 及其他未跟踪 position：`d = 0` → 轮保持静止。
+
+  另保留 `currentBaseSeparation()`（由 `/joint_states` 实测 q3/q5 计算当前
+  base 间距）供后续 “脱离现有状态强制回 home” 场景使用。
 
 > **两步运动的简化**：two-step（先回 home 再偏移）时，剖面仍覆盖总时长
 > `T = T_home + T_offset`，距离目前仅按偏移步（home → 目标）计算；
@@ -347,7 +361,12 @@ d = |L_low − L_home| = 0.67 − 0.4884 = 0.1816 m
 **home**
 - arm 目标位置向量（控制器顺序，16 维）：全 0
 - 单步执行，运动时长：`duration`（默认 3.0 s）
-- wheel 运动距离 `d = 0`（base 间距不变）→ 轮保持静止，不生成剖面
+- 前置检查不限制 arm position，但读取当前 `arm` position 查表选择 wheel
+  回程方案（去程距离取反）：
+  - 从 low 回 home：`d = −0.1816 m` → 速度曲线反向（`sign = +1`），滚回与
+    home → low 相同的距离（已验证）；
+  - 从 high 回 home：`d = +0.2011 m`（`sign = −1`，未开发测试完）；
+  - 从 home / rhombus 回 home：`d = 0` → 轮保持静止，不生成剖面
 
 **low**
 - 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, -pi/4, +pi/2, -pi/4]`

@@ -92,8 +92,10 @@ CompoundCommander::CompoundCommander(rclcpp::Node::SharedPtr node)
 
   // Signed wheel lift travel per preset: the change of the adjacent arm-base
   // separation vs home (see commander.md).  Positive = bases spread apart
-  // (home -> low), negative = bases contract (home -> high).  home and the
-  // rhombus presets do not change the base separation, so they stay 0.
+  // (home -> low), negative = bases contract (home -> high).  The rhombus
+  // presets do not change the base separation, so they stay 0.  The return
+  // trip (preset -> home) uses the NEGATED entry of this table, keyed by
+  // the state-manager arm position (see setHomeState()).
   preset_lift_distance_ = {
     {"home", 0.0},
     {"low", kBaseSepLow - kBaseSepHome},
@@ -152,14 +154,30 @@ bool CompoundCommander::setHomeState(double duration)
 
   const std::vector<ArmStep> steps{{ArmCommander::homePositions(), duration}};
 
-  if (!checkPreconditions()) {
+  // Pre-check and fetch the current arm position: the wheel scheme for the
+  // trip back home is a TABLE LOOKUP keyed by it (no joint-state
+  // measurement).  Only low -> home is fully tested; the other entries are
+  // provided for completeness.
+  const std::string arm_position = queryArmPosition();
+  if (arm_position.empty()) {
     return false;
   }
+
+  double lift_distance = 0.0;
+  const auto it = preset_lift_distance_.find(arm_position);
+  if (it != preset_lift_distance_.end()) {
+    lift_distance = -it->second;  // reverse of the home -> preset trip
+  }
+  RCLCPP_INFO(node_->get_logger(),
+              "[CompoundCommander] setHomeState: arm position '%s' -> wheel "
+              "lift travel %+.4f m (table lookup)",
+              arm_position.c_str(), lift_distance);
+
   if (!reserveGroups("home")) {
     return false;
   }
 
-  const bool ok = runWithWheelLift(steps, preset_lift_distance_.at("home"));
+  const bool ok = runWithWheelLift(steps, lift_distance);
   releaseGroups();
   return ok;
 }
@@ -305,15 +323,15 @@ bool CompoundCommander::setRhombus2State(double duration)
 }
 
 // ============================================================================
-//  checkPreconditions   (state management helper)
+//  queryArmPosition   (state management helper)
 // ============================================================================
 
-bool CompoundCommander::checkPreconditions()
+std::string CompoundCommander::queryArmPosition()
 {
   if (!state_manager_client_->wait_for_service(std::chrono::seconds(3))) {
     RCLCPP_ERROR(node_->get_logger(),
                  "[CompoundCommander] group_state_manager service not available");
-    return false;
+    return "";
   }
 
   auto req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
@@ -325,16 +343,20 @@ bool CompoundCommander::checkPreconditions()
   {
     RCLCPP_ERROR(node_->get_logger(),
                  "[CompoundCommander] Failed to call group_state_manager (get_all)");
-    return false;
+    return "";
   }
 
   auto resp = future.get();
   if (!resp->success) {
     RCLCPP_ERROR(node_->get_logger(),
                  "[CompoundCommander] get_all failed: %s", resp->message.c_str());
-    return false;
+    return "";
   }
 
+  // Common preconditions for every compound preset: all groups must be free
+  // and the veer must already be in the lift configuration.  The arm
+  // position itself is NOT constrained here (setHomeState needs it to
+  // select the wheel scheme; the offset presets check it separately).
   if (resp->arm_status != "free" ||
       resp->veer_position != "lift" ||
       resp->veer_status != "free" ||
@@ -346,12 +368,35 @@ bool CompoundCommander::checkPreconditions()
                 "veer status '%s' (need 'free'), wheel status '%s' (need 'free')",
                 resp->arm_status.c_str(), resp->veer_position.c_str(),
                 resp->veer_status.c_str(), resp->wheel_status.c_str());
-    return false;
+    return "";
   }
 
   RCLCPP_INFO(node_->get_logger(),
-              "[CompoundCommander] Preconditions OK: arm free, veer lift+free, "
-              "wheel free");
+              "[CompoundCommander] Preconditions OK: arm '%s'+free, "
+              "veer lift+free, wheel free",
+              resp->arm_position.c_str());
+  return resp->arm_position;
+}
+
+// ============================================================================
+//  checkPreconditions   (state management helper)
+// ============================================================================
+
+bool CompoundCommander::checkPreconditions()
+{
+  const std::string arm_position = queryArmPosition();
+  if (arm_position.empty()) {
+    return false;
+  }
+
+  // The offset presets always depart FROM home (their targets are defined
+  // relative to it), so the arm must currently be at home.
+  if (arm_position != "home") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[CompoundCommander] Preconditions not met, cannot execute: "
+                "arm position '%s' (need 'home')", arm_position.c_str());
+    return false;
+  }
   return true;
 }
 
@@ -500,6 +545,36 @@ bool CompoundCommander::buildOffsetSteps(
   steps = {
     {ArmCommander::homePositions(), go_home_duration},
     {offsets, offset_duration}};
+  return true;
+}
+
+// ============================================================================
+//  currentBaseSeparation   (motion helper)
+//
+//  Currently unused by the presets (the home trip is a table lookup keyed
+//  by the state-manager arm position); kept for a future "force return to
+//  home" mode that must work regardless of the recorded state.
+// ============================================================================
+
+bool CompoundCommander::currentBaseSeparation(double & separation) const
+{
+  const auto & current = arm_commander_.currentPositions();
+  double q3_sum = 0.0;
+  double q5_sum = 0.0;
+  for (int arm = 1; arm <= 4; ++arm) {
+    const std::string j3 = "arm_joint_3_" + std::to_string(arm);
+    const std::string j5 = "arm_joint_5_" + std::to_string(arm);
+    const auto it3 = current.find(j3);
+    const auto it5 = current.find(j5);
+    if (it3 == current.end() || it5 == current.end()) {
+      return false;
+    }
+    q3_sum += it3->second;
+    q5_sum += it5->second;
+  }
+  // All four arms move identically in the lift presets; average anyway to
+  // be robust against small per-arm tracking errors.
+  separation = baseSeparation(q3_sum / 4.0, q5_sum / 4.0);
   return true;
 }
 
