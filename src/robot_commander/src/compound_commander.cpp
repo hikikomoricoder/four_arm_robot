@@ -24,13 +24,6 @@ constexpr double kMinOffsetDuration = 2.0;  // s
 // Peak linear speed of the wheel lift profile.
 constexpr double kLiftPeakLinearSpeed = 0.1;  // m/s
 
-// Gazebo executes trajectories ~4x slower than the requested time_from_start
-// before reporting success (observed ratios: 1.0 s -> 4.1 s, 2.0 s -> 8.0 s,
-// 5.0 s -> 20.4 s, for both veer and arm controllers).  The wheel lift
-// profile is stretched by the same factor so that both commands start
-// together and finish together.
-constexpr double kSimDurationScale = 4.0;
-
 // If every arm joint is already within this distance of home, the home step
 // is skipped and the preset is sent as a single arm goal (the arm is then
 // commanded exactly once).
@@ -457,30 +450,62 @@ bool CompoundCommander::runWithWheelLift(
 
   const double peak_omega = peak_linear_speed / WheelCommander::WHEEL_RADIUS;
 
-  // The arm's actual execution runs ~kSimDurationScale times longer than the
-  // requested trajectory time, so the wheel profile is stretched by the same
-  // factor — both commands start together and finish together.
-  const double wheel_duration = total_duration * kSimDurationScale;
+  // The wheel profile spans the same planned duration as the arm trajectory,
+  // but its phase is read from sim time (node uses use_sim_time=true, so
+  // node_->now() tracks the Gazebo /clock topic).  Gazebo runs slower than
+  // real time, so the profile stretches automatically with the simulation
+  // and both commands start together and finish together — no hardcoded
+  // scale factor is needed.
+  const double wheel_duration = total_duration;
+
+  // Wait for a valid sim time before starting the profile.
+  {
+    const auto wait_start = std::chrono::steady_clock::now();
+    while (rclcpp::ok() && node_->now().nanoseconds() <= 0) {
+      rclcpp::spin_some(node_);
+      if (std::chrono::steady_clock::now() - wait_start > std::chrono::seconds(10)) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "[CompoundCommander] No sim time received on /clock "
+                     "after 10 s — cannot phase the wheel lift profile");
+        return false;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+  }
 
   RCLCPP_INFO(node_->get_logger(),
               "[CompoundCommander] Starting compound motion: %zu arm step(s) "
-              "(planned %.1f s, actual ~%.1f s), wheel lift w(t) = %.3f * "
-              "sin(pi * t / %.1f) rad/s",
-              steps.size(), total_duration, wheel_duration,
-              peak_omega, wheel_duration);
+              "over %.1f s (sim), wheel lift w(t) = %.3f * sin(pi * t / %.1f) "
+              "rad/s with t = sim time",
+              steps.size(), total_duration, peak_omega, wheel_duration);
 
-  // ---- Wheel lift profile (background thread, wall-clock) ---------------
-  // Runs concurrently with the arm steps for exactly wheel_duration
-  // wall-clock seconds, then publishes zero and exits.  Uses
-  // std::chrono::steady_clock — completely independent of sim time.
+  // ---- Wheel lift profile (background thread, sim-clock phased) ---------
+  // Runs concurrently with the arm steps for exactly wheel_duration of SIM
+  // time, then publishes zero and exits.  The phase t comes from sim time
+  // (node_->now()); the wall clock only paces the publish rate and guards
+  // against a stalled sim clock.
   std::thread wheel_thread([this, peak_omega, wheel_duration]() {
-    constexpr double kPeriod = 0.1;  // 10 Hz (5× sim Hz, wall-clock)
-    const auto start = std::chrono::steady_clock::now();
-    auto last_publish = start;
+    constexpr double kPeriod = 0.1;  // publish period, 10 Hz (wall clock)
+    const int64_t sim_start_ns = this->node_->now().nanoseconds();
+    const auto wall_start = std::chrono::steady_clock::now();
+    // Generous upper bound in case sim time stalls (paused sim, no /clock).
+    const double wall_limit = wheel_duration * 10.0 + 30.0;
+    auto last_publish = wall_start;
 
     while (rclcpp::ok()) {
       const auto now = std::chrono::steady_clock::now();
-      const double t = std::chrono::duration<double>(now - start).count();
+      const double wall_elapsed =
+        std::chrono::duration<double>(now - wall_start).count();
+      if (wall_elapsed > wall_limit) {
+        RCLCPP_WARN(this->node_->get_logger(),
+                    "[CompoundCommander] Wheel lift aborted: sim clock stalled "
+                    "(no progress within %.0f s wall time)", wall_limit);
+        this->wheel_commander_.publishLiftVelocity(0.0);
+        break;
+      }
+
+      const double t =
+        static_cast<double>(this->node_->now().nanoseconds() - sim_start_ns) * 1e-9;
 
       if (t >= wheel_duration) {
         this->wheel_commander_.publishLiftVelocity(0.0);
@@ -494,6 +519,8 @@ bool CompoundCommander::runWithWheelLift(
           -peak_omega * std::sin(M_PI * t / wheel_duration));
         last_publish = now;
       }
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   });
 

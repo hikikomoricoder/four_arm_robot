@@ -237,26 +237,32 @@ ros2 run robot_commander compound_commander_test <mode> [duration]
 #### 复合运动机制（arm + wheel lift 并发，双线程）
 
 arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动**设计，两者同时开始、
-各自独立运行，互不依赖时钟源：
+各自独立运行，且**相位均以仿真时间（Gazebo `/clock`）为准**：
 
 | 组件 | 线程 | 时钟 | 控制方式 |
 |------|------|------|----------|
 | arm | 主线程 | 仿真时间（Gazebo `/clock`） | `sendPositionGoal` 阻塞（内用 `spin_until_future_complete`） |
-| wheel lift | 后台线程 | 墙钟（`std::chrono::steady_clock`） | 10 Hz 循环发布 `Float64MultiArray` 到 `/wheel_controller/commands` |
+| wheel lift | 后台线程 | 相位：仿真时间（`node_->now()`，`use_sim_time=true`）；发布节奏：墙钟 10 Hz | 10 Hz 循环发布 `Float64MultiArray` 到 `/wheel_controller/commands` |
 
-- **wheel 半正弦速度剖面**（`t ∈ [0, T]`）：
+- **wheel 半正弦速度剖面**（`t ∈ [0, T]`，`t` 为仿真时间）：
   ```
   w(t) = -w_peak · sin(π·t / T)
   ```
   其中峰值角速度 `w_peak = 0.1 / 0.04 = 2.5 rad/s`（峰值线速度 0.1 m/s），
   负号表示轮的实际旋转方向与关节正方向相反（RViz 中实测修正）。
-- **T 的取值**：`T = total_duration × kSimDurationScale`，其中 `kSimDurationScale = 4.0`。
-  这是因为 Gazebo 中关节轨迹的实际执行时长总是约为请求时长的 **4 倍**
-  （实测：arm 1.0 s → 4.1 s，5.0 s → 20.4 s；veer 2.0 s → 8.0 s，一致约 4.08×），
-  因此 wheel 剖面也拉伸 4 倍，使两者同时结束。
-- **发布周期**：`kPeriod = 0.1 s`（10 Hz，即 5× sim 的 50 Hz），后台线程发布后
+- **T 的取值**：`T = total_duration`（规划时长，与 arm 轨迹的 `time_from_start`
+  完全一致，无需任何倍率）。原因是 Gazebo 的 real_time_factor ≈ 0.25
+  （实测：arm 1.0 s → 4.1 s，5.0 s → 20.4 s；veer 2.0 s → 8.0 s），
+  即仿真时间走得比墙钟慢约 4 倍。wheel 剖面的相位直接读自仿真时间
+  （`node_->now()`，节点 `use_sim_time=true` 时自动订阅 `/clock`），
+  仿真变慢时剖面自动被拉伸，与 arm 轨迹天然同时开始、同时结束，
+  RTF 变化时无需修改任何参数（替代了原先硬编码的 `kSimDurationScale = 4.0`）。
+- **发布周期**：`kPeriod = 0.1 s`（10 Hz，按墙钟计时），后台线程发布后
   不阻塞。
-- 到达 `T` 后自动发布全 0 速度并退出线程；主线程通过 `join()` 等待后台线程结束。
+- 墙钟仅用于发布节奏与**看门狗**：若仿真时间长时间不推进（仿真暂停 /
+  无 `/clock`），超过 `T × 10 + 30` 秒墙钟后发布全 0 并退出。
+- 到达 `T`（仿真时间）后自动发布全 0 速度并退出线程；主线程通过 `join()`
+  等待后台线程结束。
 
 #### 迁移机制（两步 → 一步）
 
@@ -272,7 +278,8 @@ arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动*
 
 **home**
 - arm 目标位置向量（控制器顺序，16 维）：全 0
-- 单步执行，运动时长：`duration`（默认 3.0 s），wheel lift 剖面时长 `T = duration × 4.0`
+- 单步执行，运动时长：`duration`（默认 3.0 s），wheel lift 剖面时长
+  `T = duration`（仿真时间）
 
 **low**
 - 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, -pi/4, +pi/2, -pi/4]`

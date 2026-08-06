@@ -36,9 +36,9 @@ namespace robot_commander
  *        - wheel position = "lift",    status = "occupy"
  *   3. Execute — arm trajectory steps (blocking action goals) run
  *      concurrently with the wheel lift profile in a background thread;
- *      both span the same total duration T:
+ *      both span the same total duration T in sim time:
  *        wheel w(t) = (kLiftPeakLinearSpeed / WHEEL_RADIUS) * sin(pi * t / T)
- *      published at 50 Hz (sim time), t in [0, T].
+ *      published at 10 Hz (wall clock), t = sim time in [0, T].
  *   4. Release (set_group) — arm / veer / wheel status back to "free"
  *      (positions unchanged).
  *
@@ -186,19 +186,20 @@ private:
 
   /**
    * @brief Run the arm steps while concurrently driving the wheel lift
-   *        half-sine profile, both using the same planned duration.
+   *        half-sine profile, both spanning the same planned duration.
    *
    * Two independent commands start at the same time:
    *   - Arm steps run on the main thread (blocking sendPositionGoal,
    *     sim-time based).
-   *   - Wheel lift profile runs in a background thread using wall-clock
-   *     timing (std::chrono::steady_clock), completely independent of
-   *     sim time and arm state.
+   *   - Wheel lift profile runs in a background thread whose phase t is
+   *     read from sim time (node_->now(), use_sim_time=true → /clock).
    *
-   * Because Gazebo executes trajectories ~4x slower than requested, the
-   * wheel half-sine profile spans total_duration * kSimDurationScale:
+   * Because Gazebo runs slower than real time, the sim-clock phasing
+   * stretches the wheel profile automatically, so both commands start
+   * together and finish together without any hardcoded scale factor:
    *   w(t) = (peak_linear_speed / WHEEL_RADIUS) * sin(pi * t / T)
-   * for t in [0, T], then zero — so both commands finish together.
+   * for t in [0, T] in sim time, then zero.  The wall clock only paces
+   * the publish rate (10 Hz) and guards against a stalled sim clock.
    *
    * @return true if every arm step succeeded.
    */
