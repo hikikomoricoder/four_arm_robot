@@ -196,7 +196,9 @@ arm 关节发送到 home（0 rad）。
   **mobile_base 部分**为 4 个驱动轮（经 `/wheel_controller/commands` 速度控制）
 - 前置构型：veer 关节已处于 lift（-45°）构型（由 `veer_commander_test lift` 预先执行）
 - 各 preset 的 arm 目标均定义为相对初始状态的偏移量，整个过程中四轮以 lift 模式
-  半正弦速度剖面同步运行，实现机器人变形
+  半正弦速度剖面同步运行，实现机器人变形。半正弦的峰值速度**不再硬编码**，
+  而是由各 preset 的 wheel 运动距离（由 URDF 结构计算）推导得出，
+  见下文 “wheel lift 运动距离与速度曲线” 小节。
 
 运行命令：
 
@@ -246,10 +248,17 @@ arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动*
 
 - **wheel 半正弦速度剖面**（`t ∈ [0, T]`，`t` 为仿真时间）：
   ```
-  w(t) = -w_peak · sin(π·t / T)
+  w(t) = sign · w_peak · sin(π·t / T)
   ```
-  其中峰值角速度 `w_peak = 0.1 / 0.04 = 2.5 rad/s`（峰值线速度 0.1 m/s），
-  负号表示轮的实际旋转方向与关节正方向相反（RViz 中实测修正）。
+  峰值角速度 `w_peak` **不再硬编码**，由该 preset 的 wheel 运动距离 `d`
+  （相邻 arm_base 间距变化量，见 “wheel lift 运动距离与速度曲线”）推导：
+  ```
+  v_peak = π·d / (2·T)，   w_peak = v_peak / 0.04
+  ```
+  即半正弦积分 `2·v_peak·T/π = d`，滚动距离与结构计算严格一致。
+  `sign = -1`（base 外扩，d > 0，如 home → low，轮实际转向与关节正方向
+  相反，RViz 实测修正）；`sign = +1`（base 内收，d < 0，如 home → high）。
+  `d = 0`（home / rhombus_*）时不生成剖面，轮保持静止（发布一次全 0）。
 - **T 的取值**：`T = total_duration`（规划时长，与 arm 轨迹的 `time_from_start`
   完全一致，无需任何倍率）。原因是 Gazebo 的 real_time_factor ≈ 0.25
   （实测：arm 1.0 s → 4.1 s，5.0 s → 20.4 s；veer 2.0 s → 8.0 s），
@@ -263,6 +272,65 @@ arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动*
   无 `/clock`），超过 `T × 10 + 30` 秒墙钟后发布全 0 并退出。
 - 到达 `T`（仿真时间）后自动发布全 0 速度并退出线程；主线程通过 `join()`
   等待后台线程结束。
+
+#### wheel lift 运动距离与速度曲线（结构推导）
+
+**1. 构型与简化**
+
+- lift 前置构型：四个 veer 关节均为 `-π/4`。此时每个轮的滚动方向（veer 坐标系
+  x 轴、绕 Z 转 -45°）与“base 间距变化时 base 的运动方向”（径向分量与
+  yaw 切向分量的合成）**共线**，因此轮只需纯滚动即可补偿变形，
+  滚动距离 = 相邻 arm_base 间距变化量 `|ΔL|`。
+- 四个 arm_base 由臂链串联：`arm_base_link_i → 臂 i → arm_base_link_{i+1}`，
+  且每个 preset 都保持 `q3 + q5 + q7 = 0`（总俯仰 -π），四个 base 始终共面
+  （每臂净垂直偏移恒为 `0.08 − 0.095 = −0.015 m`）。
+
+**2. 相邻 base 间距 `L(q3, q5)`（`arm_joint_1 = 0`，臂为平面链）**
+
+各链段（数值取自 `far_common_properties.xml.xacro` / `main_arm_units.xml.xacro`）：
+
+| 链段 | 组成 | 数值 |
+|------|------|------|
+| J1 → J3 | `arm_joint_1_length + arm_link_1_height + arm_joint_2_radius` | 0.04 + 0.01 + 0.03 = 0.08 m（垂直） |
+| J3 → J5 | `arm_link_2_height + arm_joint_2_radius + arm_joint_3_radius` | 0.25 + 0.03 + 0.03 = **0.31 m** |
+| J5 → J7 | `arm_link_3_height + arm_joint_3_radius + arm_joint_1_radius` | 0.25 + 0.03 + 0.03 = **0.31 m** |
+| J7 → 下一 base（group_joint） | `(arm_base_length/2, 0, arm_joint_2_radius + arm_link_1_height + arm_joint_1_length + arm_base_height/2)` | (0.05, 0, 0.095) m |
+
+方向角：J3→J5 段为 `θ₁ = −π/4 + q3`；J5→J7 段为 `θ₂ = θ₁ − π/2 + q5`；
+总俯仰 -π 时 group 偏移翻转向上，水平分量为 `-0.05`。水平间距：
+
+```
+L(q3, q5) = 0.05 + 0.31·sin(π/4 − q3) + 0.31·sin(3π/4 − q3 − q5)
+```
+
+**3. 各 preset 的间距与总运动距离（相对 home）**
+
+| preset | (q3, q5) | L（m） | wheel 运动距离 d = L − L_home（m） | 方向 |
+|--------|----------|--------|------------------------|------|
+| home | (0, 0) | 0.05 + 0.31·√2 ≈ **0.4884** | 0（轮静止） | — |
+| low | (−π/4, +π/2) | 0.05 + 0.31 + 0.31 = **0.67** | **+0.1816** | base 外扩 |
+| high | (+π/8, −π/4) | 0.05 + 2·0.31·sin(π/8) ≈ **0.2873** | **−0.2011** | base 内收 |
+| rhombus_1 / rhombus_2 | — | 不变（仅 `arm_joint_1` 竖轴转动） | 0（轮静止） | — |
+
+**home → low 总运动距离**：
+
+```
+d = |L_low − L_home| = 0.67 − 0.4884 = 0.1816 m
+```
+
+**4. 速度曲线**
+
+- 半正弦线速度剖面 `v(t) = v_peak · sin(π·t/T)`，总行程
+  `∫₀ᵀ v(t)dt = 2·v_peak·T/π`；
+- 由行程反解峰值：`v_peak = π·d / (2·T)`，峰值角速度 `w_peak = v_peak / wheel_radius`；
+- 数值例：home → low、默认 `duration = 3.0` s（home 出发为单步，T = 3.0 s）：
+  `v_peak = π × 0.1816 / (2 × 3.0) ≈ 0.095 m/s`，`w_peak ≈ 2.38 rad/s`
+  （旧版硬编码 0.1 m/s / 2.5 rad/s 与上述结构距离不一致，已替换）。
+
+> **两步运动的简化**：two-step（先回 home 再偏移）时，剖面仍覆盖总时长
+> `T = T_home + T_offset`，距离目前仅按偏移步（home → 目标）计算；
+> 若执行前不在 home，回 home 段的轮程未计入（后续可扩展为分段剖面）。
+> high 的 `sign = +1` 为按几何对称性推得，尚未在仿真中实测确认。
 
 #### 迁移机制（两步 → 一步）
 
@@ -278,8 +346,8 @@ arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动*
 
 **home**
 - arm 目标位置向量（控制器顺序，16 维）：全 0
-- 单步执行，运动时长：`duration`（默认 3.0 s），wheel lift 剖面时长
-  `T = duration`（仿真时间）
+- 单步执行，运动时长：`duration`（默认 3.0 s）
+- wheel 运动距离 `d = 0`（base 间距不变）→ 轮保持静止，不生成剖面
 
 **low**
 - 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, -pi/4, +pi/2, -pi/4]`
@@ -288,6 +356,7 @@ arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动*
   - `arm_joint_7_x` 转 `-pi/4`（-45°）＝ `-1/2 × (+pi/2)`，满足 mimic 关系
   - `arm_joint_1_x` 保持 `0`
 - 偏移步时长：`max(duration, 2.0)` s
+- wheel 运动距离 `d = +0.1816 m`（base 外扩），峰值速度由 `d` 与总时长推导
 
 **high**
 - 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, +pi/8, -pi/4, +pi/8]`
@@ -296,6 +365,7 @@ arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动*
   - `arm_joint_7_x` 转 `+pi/8`（+22.5°）＝ `-1/2 × (-pi/4)`，满足 mimic 关系
   - `arm_joint_1_x` 保持 `0`
 - 偏移步时长：`max(duration, 2.0)` s
+- wheel 运动距离 `d = −0.2011 m`（base 内收，轮反向滚动）
 
 **rhombus_1**
 - 偏移向量（控制器顺序）：仅 `arm_joint_1_x` 非零，其余 12 关节为 0
@@ -305,6 +375,7 @@ arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动*
   - `arm_joint_1_4` = `-pi/4`
 - 对角两臂（1&3、2&4）同向转动，形成菱形
 - 偏移步时长：`max(duration, 2.0)` s
+- wheel 运动距离 `d = 0`（仅竖轴转动，base 间距不变）→ 轮保持静止
 
 **rhombus_2**
 - 偏移向量（控制器顺序）：仅 `arm_joint_1_x` 非零，与 `rhombus_1` 方向相反的菱形
@@ -313,3 +384,4 @@ arm 运动与 wheel lift 剖面**并发**执行，采用**双线程独立驱动*
   - `arm_joint_1_3` = `-pi/4`
   - `arm_joint_1_4` = `+pi/4`
 - 偏移步时长：`max(duration, 2.0)` s
+- wheel 运动距离 `d = 0` → 轮保持静止

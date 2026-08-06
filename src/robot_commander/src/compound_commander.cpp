@@ -21,13 +21,60 @@ constexpr double kMaxJointVelocity = 1.0;  // rad/s
 // under Gazebo physics (same as the veer forward preset).
 constexpr double kMinOffsetDuration = 2.0;  // s
 
-// Peak linear speed of the wheel lift profile.
-constexpr double kLiftPeakLinearSpeed = 0.1;  // m/s
-
 // If every arm joint is already within this distance of home, the home step
 // is skipped and the preset is sent as a single arm goal (the arm is then
 // commanded exactly once).
 constexpr double kHomeEpsilon = 0.01;  // rad
+
+// ============================================================================
+//  Wheel lift geometry — mirrors the URDF (far_common_properties.xml.xacro,
+//  main_arm_units.xml.xacro).  See commander.md section 4 "wheel lift 运动
+//  距离与速度曲线" for the full derivation.
+// ============================================================================
+
+// -- URDF dimensions (m) ---------------------------------------------------
+constexpr double kArmBaseLength = 0.10;
+constexpr double kArmBaseHeight = 0.03;
+constexpr double kArmJoint1Length = 0.04;
+constexpr double kArmJoint1Radius = 0.03;
+constexpr double kArmJoint2Radius = 0.03;
+constexpr double kArmJoint3Radius = 0.03;
+constexpr double kArmLink1Height = 0.01;
+constexpr double kArmLink2Height = 0.25;
+constexpr double kArmLink3Height = 0.25;
+
+// -- Chain segments of one arm (J1 -> next arm base), at arm_joint_1 = 0 ----
+// J1 -> J3 vertical offset: arm_joint_1_length + arm_link_1_height +
+// arm_joint_2_radius
+constexpr double kZJ1toJ3 = kArmJoint1Length + kArmLink1Height + kArmJoint2Radius;
+// J3 -> J5 link length: arm_link_2_height + arm_joint_2_radius +
+// arm_joint_3_radius
+constexpr double kLenJ3toJ5 = kArmLink2Height + kArmJoint2Radius + kArmJoint3Radius;
+// J5 -> J7 link length: arm_link_3_height + arm_joint_3_radius +
+// arm_joint_1_radius
+constexpr double kLenJ5toJ7 = kArmLink3Height + kArmJoint3Radius + kArmJoint1Radius;
+// J7 -> next base (group_joint) offset: (arm_base_length/2, 0,
+// arm_joint_2_radius + arm_link_1_height + arm_joint_1_length +
+// arm_base_height/2)
+constexpr double kGroupOffsetX = kArmBaseLength / 2.0;
+constexpr double kGroupOffsetZ =
+  kArmJoint2Radius + kArmLink1Height + kArmJoint1Length + kArmBaseHeight / 2.0;
+
+// Horizontal separation of two consecutive arm bases.  All presets keep the
+// total arm pitch at -pi, so the group offset is applied upside down
+// (-kGroupOffsetX, 0, -kGroupOffsetZ) and the bases stay coplanar:
+//   L(q3, q5) = kGroupOffsetX + kLenJ3toJ5 * sin(pi/4 - q3)
+//                           + kLenJ5toJ7 * sin(3*pi/4 - q3 - q5)
+constexpr double baseSeparation(double q3, double q5)
+{
+  return kGroupOffsetX +
+         kLenJ3toJ5 * std::sin(M_PI_4 - q3) +
+         kLenJ5toJ7 * std::sin(3.0 * M_PI_4 - q3 - q5);
+}
+
+constexpr double kBaseSepHome = baseSeparation(0.0, 0.0);              // ~0.4884 m
+constexpr double kBaseSepLow = baseSeparation(-M_PI_4, M_PI_2);        // 0.67 m
+constexpr double kBaseSepHigh = baseSeparation(M_PI / 8.0, -M_PI_4);   // ~0.2873 m
 }  // namespace
 
 // ============================================================================
@@ -42,6 +89,35 @@ CompoundCommander::CompoundCommander(rclcpp::Node::SharedPtr node)
   // Create the group_state_manager service client
   state_manager_client_ =
     node_->create_client<robot_interfaces::srv::GroupStateManager>("group_state_manager");
+
+  // Signed wheel lift travel per preset: the change of the adjacent arm-base
+  // separation vs home (see commander.md).  Positive = bases spread apart
+  // (home -> low), negative = bases contract (home -> high).  home and the
+  // rhombus presets do not change the base separation, so they stay 0.
+  preset_lift_distance_ = {
+    {"home", 0.0},
+    {"low", kBaseSepLow - kBaseSepHome},
+    {"high", kBaseSepHigh - kBaseSepHome},
+    {"rhombus_1", 0.0},
+    {"rhombus_2", 0.0}};
+
+  RCLCPP_INFO(node_->get_logger(),
+              "[CompoundCommander] Wheel lift geometry (URDF): base separation "
+              "home %.4f m, low %.4f m, high %.4f m (travel vs home: low %+.4f m, "
+              "high %+.4f m); bases coplanar (net dz = %.4f m/arm)",
+              kBaseSepHome, kBaseSepLow, kBaseSepHigh,
+              kBaseSepLow - kBaseSepHome, kBaseSepHigh - kBaseSepHome,
+              kZJ1toJ3 - kGroupOffsetZ);
+}
+
+// ============================================================================
+//  presetLiftDistance
+// ============================================================================
+
+double CompoundCommander::presetLiftDistance(const std::string & preset) const
+{
+  const auto it = preset_lift_distance_.find(preset);
+  return it != preset_lift_distance_.end() ? it->second : 0.0;
 }
 
 // ============================================================================
@@ -83,7 +159,7 @@ bool CompoundCommander::setHomeState(double duration)
     return false;
   }
 
-  const bool ok = runWithWheelLift(steps, kLiftPeakLinearSpeed);
+  const bool ok = runWithWheelLift(steps, preset_lift_distance_.at("home"));
   releaseGroups();
   return ok;
 }
@@ -119,7 +195,7 @@ bool CompoundCommander::setLowState(double duration)
     return false;
   }
 
-  const bool ok = runWithWheelLift(steps, kLiftPeakLinearSpeed);
+  const bool ok = runWithWheelLift(steps, preset_lift_distance_.at("low"));
   releaseGroups();
   return ok;
 }
@@ -155,7 +231,7 @@ bool CompoundCommander::setHighState(double duration)
     return false;
   }
 
-  const bool ok = runWithWheelLift(steps, kLiftPeakLinearSpeed);
+  const bool ok = runWithWheelLift(steps, preset_lift_distance_.at("high"));
   releaseGroups();
   return ok;
 }
@@ -189,7 +265,7 @@ bool CompoundCommander::setRhombus1State(double duration)
     return false;
   }
 
-  const bool ok = runWithWheelLift(steps, kLiftPeakLinearSpeed);
+  const bool ok = runWithWheelLift(steps, preset_lift_distance_.at("rhombus_1"));
   releaseGroups();
   return ok;
 }
@@ -223,7 +299,7 @@ bool CompoundCommander::setRhombus2State(double duration)
     return false;
   }
 
-  const bool ok = runWithWheelLift(steps, kLiftPeakLinearSpeed);
+  const bool ok = runWithWheelLift(steps, preset_lift_distance_.at("rhombus_2"));
   releaseGroups();
   return ok;
 }
@@ -432,7 +508,7 @@ bool CompoundCommander::buildOffsetSteps(
 // ============================================================================
 
 bool CompoundCommander::runWithWheelLift(
-  const std::vector<ArmStep> & steps, double peak_linear_speed)
+  const std::vector<ArmStep> & steps, double lift_distance)
 {
   if (!rclcpp::ok() || steps.empty()) {
     return false;
@@ -448,8 +524,6 @@ bool CompoundCommander::runWithWheelLift(
     return false;
   }
 
-  const double peak_omega = peak_linear_speed / WheelCommander::WHEEL_RADIUS;
-
   // The wheel profile spans the same planned duration as the arm trajectory,
   // but its phase is read from sim time (node uses use_sim_time=true, so
   // node_->now() tracks the Gazebo /clock topic).  Gazebo runs slower than
@@ -458,71 +532,96 @@ bool CompoundCommander::runWithWheelLift(
   // scale factor is needed.
   const double wheel_duration = total_duration;
 
-  // Wait for a valid sim time before starting the profile.
-  {
-    const auto wait_start = std::chrono::steady_clock::now();
-    while (rclcpp::ok() && node_->now().nanoseconds() <= 0) {
-      rclcpp::spin_some(node_);
-      if (std::chrono::steady_clock::now() - wait_start > std::chrono::seconds(10)) {
-        RCLCPP_ERROR(node_->get_logger(),
-                     "[CompoundCommander] No sim time received on /clock "
-                     "after 10 s — cannot phase the wheel lift profile");
-        return false;
+  // Velocity curve derived from the travel distance (see commander.md
+  // "wheel lift 运动距离与速度曲线"): the half-sine profile
+  //   v(t) = v_peak * sin(pi * t / T),  t in [0, T]
+  // integrates to 2 * v_peak * T / pi, so the peak that rolls exactly
+  // |lift_distance| over T is v_peak = pi * |lift_distance| / (2 * T).
+  // The sign carries the rolling direction: spreading the bases apart
+  // (lift_distance >= 0, e.g. home -> low) keeps the negative command sign
+  // observed in RViz; contracting (lift_distance < 0) reverses it.
+  const double direction = (lift_distance >= 0.0) ? -1.0 : 1.0;
+  const double peak_linear_speed =
+    M_PI * std::abs(lift_distance) / (2.0 * wheel_duration);
+  const double peak_omega = peak_linear_speed / WheelCommander::WHEEL_RADIUS;
+
+  std::thread wheel_thread;
+  if (peak_omega > 1e-9) {
+    // Wait for a valid sim time before starting the profile.
+    {
+      const auto wait_start = std::chrono::steady_clock::now();
+      while (rclcpp::ok() && node_->now().nanoseconds() <= 0) {
+        rclcpp::spin_some(node_);
+        if (std::chrono::steady_clock::now() - wait_start > std::chrono::seconds(10)) {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "[CompoundCommander] No sim time received on /clock "
+                       "after 10 s — cannot phase the wheel lift profile");
+          return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+
+    RCLCPP_INFO(node_->get_logger(),
+                "[CompoundCommander] Starting compound motion: %zu arm step(s) "
+                "over %.1f s (sim), wheel lift travel %.4f m -> "
+                "w(t) = %.3f * sin(pi * t / %.1f) rad/s with t = sim time",
+                steps.size(), total_duration, lift_distance,
+                direction * peak_omega, wheel_duration);
+
+    // ---- Wheel lift profile (background thread, sim-clock phased) --------
+    // Runs concurrently with the arm steps for exactly wheel_duration of SIM
+    // time, then publishes zero and exits.  The phase t comes from sim time
+    // (node_->now()); the wall clock only paces the publish rate and guards
+    // against a stalled sim clock.
+    wheel_thread = std::thread([this, direction, peak_omega, wheel_duration]() {
+      constexpr double kPeriod = 0.1;  // publish period, 10 Hz (wall clock)
+      const int64_t sim_start_ns = this->node_->now().nanoseconds();
+      const auto wall_start = std::chrono::steady_clock::now();
+      // Generous upper bound in case sim time stalls (paused sim, no /clock).
+      const double wall_limit = wheel_duration * 10.0 + 30.0;
+      auto last_publish = wall_start;
+
+      while (rclcpp::ok()) {
+        const auto now = std::chrono::steady_clock::now();
+        const double wall_elapsed =
+          std::chrono::duration<double>(now - wall_start).count();
+        if (wall_elapsed > wall_limit) {
+          RCLCPP_WARN(this->node_->get_logger(),
+                      "[CompoundCommander] Wheel lift aborted: sim clock stalled "
+                      "(no progress within %.0f s wall time)", wall_limit);
+          this->wheel_commander_.publishLiftVelocity(0.0);
+          break;
+        }
+
+        const double t =
+          static_cast<double>(this->node_->now().nanoseconds() - sim_start_ns) * 1e-9;
+
+        if (t >= wheel_duration) {
+          this->wheel_commander_.publishLiftVelocity(0.0);
+          break;
+        }
+
+        if (std::chrono::duration<double>(now - last_publish).count() >= kPeriod) {
+          // Sign: the wheel rotation direction observed in RViz is opposite
+          // to the joint's positive direction when the bases spread apart.
+          this->wheel_commander_.publishLiftVelocity(
+            direction * peak_omega * std::sin(M_PI * t / wheel_duration));
+          last_publish = now;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    });
+  } else {
+    // No wheel travel required by this preset (e.g. home / rhombus_*):
+    // keep the wheels still instead of running a profile.
+    RCLCPP_INFO(node_->get_logger(),
+                "[CompoundCommander] Starting compound motion: %zu arm step(s) "
+                "over %.1f s (sim), no wheel lift travel needed — wheels stay still",
+                steps.size(), total_duration);
+    wheel_commander_.publishLiftVelocity(0.0);
   }
-
-  RCLCPP_INFO(node_->get_logger(),
-              "[CompoundCommander] Starting compound motion: %zu arm step(s) "
-              "over %.1f s (sim), wheel lift w(t) = %.3f * sin(pi * t / %.1f) "
-              "rad/s with t = sim time",
-              steps.size(), total_duration, peak_omega, wheel_duration);
-
-  // ---- Wheel lift profile (background thread, sim-clock phased) ---------
-  // Runs concurrently with the arm steps for exactly wheel_duration of SIM
-  // time, then publishes zero and exits.  The phase t comes from sim time
-  // (node_->now()); the wall clock only paces the publish rate and guards
-  // against a stalled sim clock.
-  std::thread wheel_thread([this, peak_omega, wheel_duration]() {
-    constexpr double kPeriod = 0.1;  // publish period, 10 Hz (wall clock)
-    const int64_t sim_start_ns = this->node_->now().nanoseconds();
-    const auto wall_start = std::chrono::steady_clock::now();
-    // Generous upper bound in case sim time stalls (paused sim, no /clock).
-    const double wall_limit = wheel_duration * 10.0 + 30.0;
-    auto last_publish = wall_start;
-
-    while (rclcpp::ok()) {
-      const auto now = std::chrono::steady_clock::now();
-      const double wall_elapsed =
-        std::chrono::duration<double>(now - wall_start).count();
-      if (wall_elapsed > wall_limit) {
-        RCLCPP_WARN(this->node_->get_logger(),
-                    "[CompoundCommander] Wheel lift aborted: sim clock stalled "
-                    "(no progress within %.0f s wall time)", wall_limit);
-        this->wheel_commander_.publishLiftVelocity(0.0);
-        break;
-      }
-
-      const double t =
-        static_cast<double>(this->node_->now().nanoseconds() - sim_start_ns) * 1e-9;
-
-      if (t >= wheel_duration) {
-        this->wheel_commander_.publishLiftVelocity(0.0);
-        break;
-      }
-
-      if (std::chrono::duration<double>(now - last_publish).count() >= kPeriod) {
-        // Negative sign: wheel rotation direction observed in RViz is
-        // opposite to the joint's positive direction.
-        this->wheel_commander_.publishLiftVelocity(
-          -peak_omega * std::sin(M_PI * t / wheel_duration));
-        last_publish = now;
-      }
-
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-  });
 
   // ---- Run arm steps (main thread, sim-time based) --------------------
   bool arm_ok = true;

@@ -6,6 +6,7 @@
 #include <robot_commander/arm_commander.hpp>
 #include <robot_commander/wheel_commander.hpp>
 #include <chrono>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -36,9 +37,13 @@ namespace robot_commander
  *        - wheel position = "lift",    status = "occupy"
  *   3. Execute — arm trajectory steps (blocking action goals) run
  *      concurrently with the wheel lift profile in a background thread;
- *      both span the same total duration T in sim time:
- *        wheel w(t) = (kLiftPeakLinearSpeed / WHEEL_RADIUS) * sin(pi * t / T)
+ *      both span the same total duration T in sim time.  The half-sine
+ *      peak speed is derived from the preset's wheel travel distance d
+ *      (change of the adjacent arm-base separation, computed from the
+ *      URDF geometry — see commander.md section 4):
+ *        w(t) = sign * (pi * |d| / (2 * T * WHEEL_RADIUS)) * sin(pi * t / T)
  *      published at 10 Hz (wall clock), t = sim time in [0, T].
+ *      When d = 0 (home / rhombus_* presets) the wheels stay still.
  *   4. Release (set_group) — arm / veer / wheel status back to "free"
  *      (positions unchanged).
  *
@@ -129,6 +134,16 @@ public:
    */
   bool setRhombus2State(double duration = 3.0);
 
+  /**
+   * @brief Signed wheel lift travel (m) needed to reach a preset from home:
+   *        the change of the adjacent arm-base separation, computed from
+   *        the URDF geometry (see commander.md section 4).  Positive =
+   *        bases spread apart (home -> low); negative = bases contract
+   *        (home -> high); 0 for home / rhombus presets.
+   * @return 0.0 for unknown preset names.
+   */
+  double presetLiftDistance(const std::string & preset) const;
+
 private:
   /** One arm trajectory step: target positions + step duration. */
   struct ArmStep
@@ -196,20 +211,34 @@ private:
    *
    * Because Gazebo runs slower than real time, the sim-clock phasing
    * stretches the wheel profile automatically, so both commands start
-   * together and finish together without any hardcoded scale factor:
-   *   w(t) = (peak_linear_speed / WHEEL_RADIUS) * sin(pi * t / T)
-   * for t in [0, T] in sim time, then zero.  The wall clock only paces
-   * the publish rate (10 Hz) and guards against a stalled sim clock.
+   * together and finish together without any hardcoded scale factor.
    *
+   * The peak speed is derived from the required travel distance so the
+   * profile rolls exactly |lift_distance| over the planned duration T:
+   *   v(t)   = v_peak * sin(pi * t / T)
+   *   v_peak = pi * |lift_distance| / (2 * T)
+   * (half-sine integral 2 * v_peak * T / pi = |lift_distance|), and
+   *   w(t) = sign * (v_peak / WHEEL_RADIUS) * sin(pi * t / T)
+   * with sign = -1 when the bases spread apart (lift_distance >= 0,
+   * the wheel direction observed in RViz) and +1 when they contract.
+   * When lift_distance is 0 the wheels are kept still (single zero
+   * command, no profile thread).  The wall clock only paces the publish
+   * rate (10 Hz) and guards against a stalled sim clock.
+   *
+   * @param steps          Arm trajectory steps.
+   * @param lift_distance  Signed wheel travel (m) required by the preset
+   *                       (change of the adjacent-base separation vs home).
    * @return true if every arm step succeeded.
    */
   bool runWithWheelLift(
-    const std::vector<ArmStep> & steps, double peak_linear_speed);
+    const std::vector<ArmStep> & steps, double lift_distance);
 
   rclcpp::Node::SharedPtr node_;
   ArmCommander arm_commander_;
   WheelCommander wheel_commander_;
   rclcpp::Client<robot_interfaces::srv::GroupStateManager>::SharedPtr state_manager_client_;
+  /// Signed wheel lift travel per preset (see presetLiftDistance).
+  std::map<std::string, double> preset_lift_distance_;
 };
 
 }  // namespace robot_commander
