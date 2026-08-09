@@ -13,6 +13,7 @@ import time
 
 from panorama_camera.four_camera_concat import FourCameraStitcher
 from panorama_camera.detect_locate import Yolo11OnnxDetector, Yolo11TrtDetector
+from panorama_camera.panorama_info import enrich_detections_with_azimuth
 
 class DisplayFourCamera(Node):
     def __init__(self):
@@ -157,11 +158,18 @@ class DisplayFourCamera(Node):
                 if self.if_det:
                     detections = self.detector.detect_panorama(show_pano)
 
+                    # Attach azimuth attributes via the 10° interval table
+                    detections = enrich_detections_with_azimuth(
+                        detections, self._last_intervals,
+                        pano_w=panorama.shape[1], display_w=max_w)
+
                     self.get_logger().info(f'Detections: {detections}')
                     for det in detections:
                         x1, y1, x2, y2 = det['bbox']
                         cv2.rectangle(show_pano, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        label = f"{det['class_name']} {det['score']:.2f}"
+                        az = det.get('azimuth_deg')
+                        az_str = f' {az}' if az is not None else ''
+                        label = f"{det['class_name']} {det['score']:.2f} {az_str}"
                         cv2.putText(
                             show_pano, label,
                             (x1, y1 - 10),
