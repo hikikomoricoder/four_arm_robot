@@ -360,6 +360,28 @@ bool WheelCommander::driveWithVelocities(const std::vector<double> & velocities,
     return false;
   }
 
+  // ---- Feature 1: Wait for controller subscriber ----------------------
+  {
+    RCLCPP_INFO(node_->get_logger(),
+                "[WheelCommander] Waiting for subscriber on %s ...",
+                command_topic_.c_str());
+
+    const auto match_deadline = node_->now() + rclcpp::Duration::from_seconds(3.0);
+    while (rclcpp::ok() && velocity_pub_->get_subscription_count() == 0) {
+      if (node_->now() >= match_deadline) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "[WheelCommander] No subscriber on %s after %.1f s "
+                     "(controller not running?)",
+                     command_topic_.c_str(), 3.0);
+        return false;
+      }
+      rclcpp::spin_some(node_);
+    }
+    RCLCPP_INFO(node_->get_logger(),
+                "[WheelCommander] Controller connected (%zu subscriber(s))",
+                velocity_pub_->get_subscription_count());
+  }
+
   // ------------------------------------------------------------------
   // Publish velocity command
   // ------------------------------------------------------------------

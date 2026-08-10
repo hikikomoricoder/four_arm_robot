@@ -110,6 +110,10 @@ public:
 
   /**
    * @brief Publish a custom velocity profile for a given duration, then stop.
+   *
+   * Before publishing, waits for at least one subscriber on the command
+   * topic (3 s sim-time timeout).
+   *
    * @param velocities  4-element vector in controller joint order:
    *                    [wheel_joint_4, wheel_joint_3, wheel_joint_2, wheel_joint_1].
    * @param duration    Movement duration (seconds).
