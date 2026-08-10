@@ -23,7 +23,8 @@ namespace robot_commander
  *   auto node = std::make_shared<rclcpp::Node>(...);
  *   WheelCommander wc(node);
  *   wc.driveForward(0.1, 1.0);        // differential forward
- *   wc.driveTurn(0.1, 1.0);           // all wheels forward
+ *   wc.turnRightWithSpeed(0.1, 1.0);  // turn right in place
+ *   wc.turnLeftWithSpeed(0.1, 1.0);   // turn left in place
  *
  * Linear speed (m/s) is converted internally to angular velocity (rad/s)
  * using the wheel radius (0.04 m).
@@ -64,16 +65,33 @@ public:
   // -- drive commands -----------------------------------------------------
 
   /**
-   * @brief All 4 wheels rotate forward at the same linear speed.
+   * @brief Turn right in place: all 4 wheels rotate at the same linear speed.
    *
-   * Reserves the "wheel" group via /group_state_manager (mode "turn")
-   * before moving and releases it after the movement completes.
+   * Pre-checks: veer position must be "turn", veer status must be "free",
+   * wheel status must be "free".  Reserves the "wheel" group via
+   * /group_state_manager (position "turn") before moving and releases it
+   * after the movement completes.
    *
    * @param linear_speed  Desired ground speed (m/s), default 0.1.
    * @param duration      Movement duration (seconds), default 1.0.
    * @return true on success.
    */
-  bool driveTurn(double linear_speed = 0.1, double duration = 1.0);
+  bool turnRightWithSpeed(double linear_speed = 0.1, double duration = 1.0);
+
+  /**
+   * @brief Turn left in place: all 4 wheels rotate at the same linear speed
+   *        in the opposite direction of turnRightWithSpeed.
+   *
+   * Pre-checks: veer position must be "turn", veer status must be "free",
+   * wheel status must be "free".  Reserves the "wheel" group via
+   * /group_state_manager (position "turn") before moving and releases it
+   * after the movement completes.
+   *
+   * @param linear_speed  Desired ground speed (m/s), default 0.1.
+   * @param duration      Movement duration (seconds), default 1.0.
+   * @return true on success.
+   */
+  bool turnLeftWithSpeed(double linear_speed = 0.1, double duration = 1.0);
 
   /**
    * @brief Differential steering: wheel_joint_1,2 forward,

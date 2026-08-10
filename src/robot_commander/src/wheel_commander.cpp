@@ -181,11 +181,54 @@ void WheelCommander::releaseWheel()
 }
 
 // ============================================================================
-//  driveTurn
+//  turnRightWithSpeed
 // ============================================================================
 
-bool WheelCommander::driveTurn(double linear_speed, double duration)
+bool WheelCommander::turnRightWithSpeed(double linear_speed, double duration)
 {
+  // ---- Pre-check: veer must be in "turn" position and free -----------
+  if (!state_manager_client_->wait_for_service(std::chrono::seconds(3))) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] group_state_manager service not available");
+    return false;
+  }
+
+  auto veer_req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
+  veer_req->command = "get_group";
+  veer_req->group_name = "veer";
+
+  auto veer_future = state_manager_client_->async_send_request(veer_req);
+  if (rclcpp::spin_until_future_complete(node_, veer_future) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] Failed to query veer state");
+    return false;
+  }
+
+  auto veer_resp = veer_future.get();
+  if (!veer_resp->success) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] get_group veer failed: %s",
+                 veer_resp->message.c_str());
+    return false;
+  }
+
+  if (veer_resp->veer_position != "turn") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] veer position is '%s' (not 'turn'), cannot turn",
+                veer_resp->veer_position.c_str());
+    return false;
+  }
+
+  if (veer_resp->veer_status != "free") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] veer status is '%s' (not 'free'), cannot turn",
+                veer_resp->veer_status.c_str());
+    return false;
+  }
+
+  // ---- Reserve wheel --------------------------------------------------
   if (!reserveWheel("turn")) {
     return false;
   }
@@ -193,7 +236,8 @@ bool WheelCommander::driveTurn(double linear_speed, double duration)
   const double angular_vel = linear_speed / WHEEL_RADIUS;
 
   RCLCPP_INFO(node_->get_logger(),
-              "[WheelCommander] driveTurn: all wheels @ %.3f rad/s (%.3f m/s) for %.1f s",
+              "[WheelCommander] turnRightWithSpeed: all wheels @ +%.3f rad/s (%.3f m/s) "
+              "for %.1f s",
               angular_vel, linear_speed, duration);
 
   const std::vector<double> velocities = {
@@ -201,6 +245,77 @@ bool WheelCommander::driveTurn(double linear_speed, double duration)
     angular_vel,   // wheel_joint_3
     angular_vel,   // wheel_joint_2
     angular_vel    // wheel_joint_1
+  };
+  bool ok = driveWithVelocities(velocities, duration);
+  releaseWheel();
+  return ok;
+}
+
+// ============================================================================
+//  turnLeftWithSpeed
+// ============================================================================
+
+bool WheelCommander::turnLeftWithSpeed(double linear_speed, double duration)
+{
+  // ---- Pre-check: veer must be in "turn" position and free -----------
+  if (!state_manager_client_->wait_for_service(std::chrono::seconds(3))) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] group_state_manager service not available");
+    return false;
+  }
+
+  auto veer_req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
+  veer_req->command = "get_group";
+  veer_req->group_name = "veer";
+
+  auto veer_future = state_manager_client_->async_send_request(veer_req);
+  if (rclcpp::spin_until_future_complete(node_, veer_future) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] Failed to query veer state");
+    return false;
+  }
+
+  auto veer_resp = veer_future.get();
+  if (!veer_resp->success) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] get_group veer failed: %s",
+                 veer_resp->message.c_str());
+    return false;
+  }
+
+  if (veer_resp->veer_position != "turn") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] veer position is '%s' (not 'turn'), cannot turn",
+                veer_resp->veer_position.c_str());
+    return false;
+  }
+
+  if (veer_resp->veer_status != "free") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] veer status is '%s' (not 'free'), cannot turn",
+                veer_resp->veer_status.c_str());
+    return false;
+  }
+
+  // ---- Reserve wheel --------------------------------------------------
+  if (!reserveWheel("turn")) {
+    return false;
+  }
+
+  const double angular_vel = linear_speed / WHEEL_RADIUS;
+
+  RCLCPP_INFO(node_->get_logger(),
+              "[WheelCommander] turnLeftWithSpeed: all wheels @ -%.3f rad/s (%.3f m/s) "
+              "for %.1f s",
+              angular_vel, linear_speed, duration);
+
+  const std::vector<double> velocities = {
+    -angular_vel,   // wheel_joint_4
+    -angular_vel,   // wheel_joint_3
+    -angular_vel,   // wheel_joint_2
+    -angular_vel    // wheel_joint_1
   };
   bool ok = driveWithVelocities(velocities, duration);
   releaseWheel();

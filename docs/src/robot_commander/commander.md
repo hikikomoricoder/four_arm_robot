@@ -85,7 +85,7 @@ ros2 run robot_commander veer_commander_test <mode> [duration]
 
 ```bash
 ros2 run robot_commander wheel_command <mode> [speed] [duration]
-#   mode      'forward' | 'turn'
+#   mode      'forward' | 'turn_right_speed' | 'turn_left_speed'
 #   speed     线速度（m/s），默认 0.1
 #   duration  运动时长（秒），默认 1.0
 ```
@@ -95,7 +95,8 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 | mode | 调用函数 | 各关节角速度（rad/s） | 说明 |
 |------|----------|------------------------|------|
 | `forward` | `driveForward(speed, duration)` | j1=`+w`, j2=`+w`, j3=`-w`, j4=`-w` | 差速前进：1,2 正转，3,4 反转 |
-| `turn` | `driveTurn(speed, duration)` | j1=`+w`, j2=`+w`, j3=`+w`, j4=`+w` | 所有轮同向同速转动 |
+| `turn_right_speed` | `turnRightWithSpeed(speed, duration)` | j1=`+w`, j2=`+w`, j3=`+w`, j4=`+w` | 所有轮同向同速转动，原地右转 |
+| `turn_left_speed` | `turnLeftWithSpeed(speed, duration)` | j1=`-w`, j2=`-w`, j3=`-w`, j4=`-w` | 所有轮同向同速反向转动，原地左转 |
 
 ### 各 mode 细节
 
@@ -104,9 +105,15 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 每个 `mode` 在发布速度命令（`driveWithVelocities`）前后会向 `/group_state_manager` service 发送请求，形成控制闭环：
 
 1. **执行前** — 调用 `get_group` 查询 `wheel` 组的 `status`：
-   - 若为 `"free"`，则调用 `set_group` 将 `status` 设为 `"occupy"`、`position` 设为对应的 mode 名（`forward`/`turn`）。
+   - 若为 `"free"`，则调用 `set_group` 将 `status` 设为 `"occupy"`、`position` 设为对应的 mode 名（`forward` 设为 `forward`，`turn_right_speed` / `turn_left_speed` 均设为 `turn`）。
    - 若不为 `"free"`，则拒绝执行并返回 `false`（不会发布任何速度命令）。
 2. **执行后** — 调用 `set_group` 将 `status` 重置为 `"free"`（`position` 保持不变）。
+
+> **`turn_right_speed` / `turn_left_speed` 前置 veer 检查**：
+> 在锁定 wheel 之前，额外查询 `veer` 组状态，要求：
+> - `veer` 的 `position` 必须为 `"turn"`
+> - `veer` 的 `status` 必须为 `"free"`
+> 任一条件不满足则拒绝执行（不发布速度命令）。veer 本身不会被锁定。
 
 **forward**
 - 发布速度向量（控制器顺序 `[j4, j3, j2, j1]`）：`[-w, -w, +w, +w]`
@@ -116,9 +123,14 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
   - `wheel_joint_4` = `-w`（反转）
 - 持续 `duration` 后停止（发布 `[0, 0, 0, 0]`）
 
-**turn**
+**turn_right_speed**
 - 发布速度向量（控制器顺序 `[j4, j3, j2, j1]`）：`[+w, +w, +w, +w]`
   - 四个轮均为 `+w`（同向同速）
+- 持续 `duration` 后停止（发布 `[0, 0, 0, 0]`）
+
+**turn_left_speed**
+- 发布速度向量（控制器顺序 `[j4, j3, j2, j1]`）：`[-w, -w, -w, -w]`
+  - 四个轮均为 `-w`（同向同速，与 `turn_right_speed` 方向相反）
 - 持续 `duration` 后停止（发布 `[0, 0, 0, 0]`）
 
 ---
