@@ -88,4 +88,8 @@
         <param name="use_sim_time" value="true"/>
     </node>
 
+    <!-- Robot status display & control panel (borderless tkinter window, Alt+F4 to close).
+         Pure tkinter for now; add use_sim_time once the panel integrates rclpy. -->
+    <node pkg="robot_panel" exec="robot_panel" output="screen" />
+
 </launch>
