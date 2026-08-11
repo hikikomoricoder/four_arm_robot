@@ -45,11 +45,29 @@ class RobotPanel(tk.Tk):
         self.protocol('WM_DELETE_WINDOW', self.close)
         self.after(100, self.focus_force)
 
+        self._move_offset = None
+        self.bind('<Control-ButtonPress-1>', self._start_move)
+        self.bind('<Control-B1-Motion>', self._on_move)
+        self.bind('<Control-ButtonRelease-1>', self._end_move)
+
     def _center_on_screen(self):
         self.update_idletasks()
         x = (self.winfo_screenwidth() - WINDOW_W) // 2
         y = (self.winfo_screenheight() - WINDOW_H) // 2
         self.geometry(f'+{x}+{y}')
+
+    def _start_move(self, event):
+        self._move_offset = (event.x_root - self.winfo_x(),
+                             event.y_root - self.winfo_y())
+
+    def _on_move(self, event):
+        if self._move_offset is None:
+            return
+        ox, oy = self._move_offset
+        self.geometry(f'+{event.x_root - ox}+{event.y_root - oy}')
+
+    def _end_move(self, _event):
+        self._move_offset = None
 
     def _make_block(self, name, x, y, w, h):
         frame = tk.Frame(self, bg=COLOR_BG, bd=0,
