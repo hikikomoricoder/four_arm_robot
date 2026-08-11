@@ -5,6 +5,7 @@
 ## 界面规格
 
 - 窗口：1070×750，无边框（`overrideredirect`），启动居中，`Alt+F4` 关闭
+- 移动：按住 `Ctrl` + 左键拖动窗口（记录按下点与窗口左上角的偏移，拖动时按偏移更新位置）
 - 外边距：四边各 10px；内容块间距：10px
 - 配色：基底灰黑 `#2b2b2b`，文字白色，内容块白色 1px 边线
 
@@ -46,4 +47,3 @@ ros2 run robot_panel robot_panel
 - 接入 rclpy：后台线程 spin，UI 更新经 `after()` 回到主线程
 - robot_state：对接 robot_state_manager 状态服务；control_commander：调用 commander 接口
 - panorama / camera：订阅图像话题，经 PIL.ImageTk 显示
-- 可选：为无边框窗口增加拖拽移动
