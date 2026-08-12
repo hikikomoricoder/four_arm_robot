@@ -1,5 +1,20 @@
 <launch>
+    <!-- ===================== External service manager ===================== -->
+    <!-- Launches and health-checks non-ROS services (TTS, inference, etc.).
+         Config loaded from tts_config.json (seperated_service array). -->
+    <node pkg="seperated_service" exec="service_manager" name="service_manager" output="screen">
+        <param name="config_file" value="/home/dcx/four_arm_robot/extend/moss_tts_nano/tts_config.json" />
+        <param name="check_interval" value="10.0" />
+        <param name="startup_delay" value="2.0" />
+    </node>
+
     <arg name="log_level" default="warn" />
+
+    <!-- ===================== On-demand feature toggles ===================== -->
+    <arg name="use_rviz"     default="false" />
+    <arg name="use_moveit"   default="true" />
+    <arg name="use_panorama" default="true" />
+    <arg name="use_stereo"   default="true" />
     <let name="urdf_path" value="$(find-pkg-share my_robot_description)/urdf/four_arm_robot.xml.xacro" />
     <let name="rviz_config_path" value="$(find-pkg-share my_robot_description)/rviz/urdf_config.rviz" />
     <let name="gazebo_config_path" value="$(find-pkg-share my_robot_bringup)/config/gazebo_bridge.yaml" />
@@ -42,18 +57,19 @@
         <param name="config_file" value="$(var gazebo_config_path)" />
     </node>
 
-    <node pkg="rviz2" exec="rviz2" output="screen" args="-d $(var rviz_config_path)">
+    <node pkg="rviz2" exec="rviz2" output="screen" args="-d $(var rviz_config_path)" if="$(var use_rviz)">
         <param name="use_sim_time" value="true"/>
     </node>
 
-    <include file="$(find-pkg-share robot_moveit_config)/launch/move_group_gazebo.launch.py" />
+    <include file="$(find-pkg-share robot_moveit_config)/launch/move_group_gazebo.launch.py" if="$(var use_moveit)" />
     <!-- <include file="$(find-pkg-share robot_moveit_config)/launch/spawn_controllers.launch.py" /> -->
 
-    <node pkg="panorama_camera" exec="display_four_camera" output="screen" args="--ros-args --log-level $(var log_level)">
+    <node pkg="panorama_camera" exec="display_four_camera" output="screen" args="--ros-args --log-level $(var log_level)" if="$(var use_panorama)">
         <param name="use_sim_time" value="true"/>
     </node>
 
     <!-- ===================== Stereo ranging (camera_5 / camera_6) ===================== -->
+    <group if="$(var use_stereo)">
     <!-- Gazebo bridges camera_info with Tx=0 (monocular). These corrector nodes relay
          the messages and replace the calibration matrices with correct stereo values
          (right camera Tx = -fx * baseline) so stereo_image_proc computes metric disparity. -->
@@ -87,6 +103,7 @@
     <node pkg="stereo_camera" exec="stereo_camera_processor" output="screen" args="--ros-args --log-level $(var log_level)">
         <param name="use_sim_time" value="true"/>
     </node>
+    </group>
 
     <!-- Robot status display & control panel (borderless tkinter window, Alt+F4 to close).
          Pure tkinter for now; add use_sim_time once the panel integrates rclpy. -->

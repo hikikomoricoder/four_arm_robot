@@ -6,6 +6,8 @@
 
 - 第三方扩展
   - [extend 说明](extend/readme.md)
+  - [MOSS-TTS-Nano 扩展](extend/mos_tts_nano/moss_tts_nano_extend.md)
+  - [service_manager 服务管理](extend/seperated_service/service_manager.md)
   - [YOLO11s 知识蒸馏方案](extend/ultralytics/distillation.md)
 
 - 源码模块文档
