@@ -2,23 +2,27 @@
 
 import tkinter as tk
 
+from .camera import CameraBlock
+from .control_commander import ControlCommanderBlock
+from .drawer import Drawer
+from .panorama import PanoramaBlock
+from .robot_state import RobotStateBlock
+
 WINDOW_W = 1070
 WINDOW_H = 750
 PAD = 10
 GAP = 10
-DRAWER_W = 180
-HANDLE_W = 24
 
 COLOR_BG = '#2b2b2b'
 COLOR_FG = '#ffffff'
 COLOR_BORDER = '#ffffff'
 
-# (name, x, y, width, height)
+# (name, x, y, width, height, block_class)
 BLOCK_LAYOUT = (
-    ('robot_state', PAD, PAD, 320, 480),
-    ('control_commander', PAD + 320 + GAP, PAD, 720, 480),
-    ('panorama', PAD + 320 + GAP, PAD + 480 + GAP, 720, 240),
-    ('camera', PAD, PAD + 480 + GAP, 320, 240),
+    ('robot_state',       PAD,           PAD,                 320, 480, RobotStateBlock),
+    ('control_commander', PAD + 320 + GAP, PAD,               720, 480, ControlCommanderBlock),
+    ('panorama',          PAD + 320 + GAP, PAD + 480 + GAP,   720, 240, PanoramaBlock),
+    ('camera',            PAD,           PAD + 480 + GAP,     320, 240, CameraBlock),
 )
 
 
@@ -35,11 +39,13 @@ class RobotPanel(tk.Tk):
         self._center_on_screen()
 
         self.blocks = {}
-        for name, x, y, w, h in BLOCK_LAYOUT:
-            self.blocks[name] = self._make_block(name, x, y, w, h)
+        for name, x, y, w, h, cls in BLOCK_LAYOUT:
+            block = cls(self, COLOR_BG, COLOR_FG, COLOR_BORDER)
+            block.place(x=x, y=y, width=w, height=h)
+            self.blocks[name] = block
 
-        self._drawer_expanded = False
-        self._build_drawer()
+        self.drawer = Drawer(self, WINDOW_W, WINDOW_H,
+                             COLOR_BG, COLOR_FG, COLOR_BORDER)
 
         self.bind_all('<Alt-F4>', lambda _event: self.close())
         self.protocol('WM_DELETE_WINDOW', self.close)
@@ -69,53 +75,13 @@ class RobotPanel(tk.Tk):
     def _end_move(self, _event):
         self._move_offset = None
 
-    def _make_block(self, name, x, y, w, h):
-        frame = tk.Frame(self, bg=COLOR_BG, bd=0,
-                         highlightbackground=COLOR_BORDER,
-                         highlightcolor=COLOR_BORDER,
-                         highlightthickness=1)
-        frame.place(x=x, y=y, width=w, height=h)
-        tk.Label(frame, text=name, bg=COLOR_BG,
-                 fg=COLOR_FG).place(relx=0.5, rely=0.5, anchor='center')
-        return frame
-
-    def _build_drawer(self):
-        self.drawer = tk.Frame(self, bg=COLOR_BG, bd=0,
-                               highlightbackground=COLOR_BORDER,
-                               highlightcolor=COLOR_BORDER,
-                               highlightthickness=1)
-        self._toggle_btn = tk.Button(
-            self.drawer, text='<', relief='flat', bd=0,
-            bg=COLOR_BG, fg=COLOR_FG,
-            activebackground=COLOR_BG, activeforeground=COLOR_FG,
-            command=self.toggle_drawer)
-        self._toggle_btn.place(x=2, y=4, width=20, height=28)
-        self._drawer_content = tk.Frame(self.drawer, bg=COLOR_BG)
-        tk.Label(self._drawer_content, bg=COLOR_BG, fg=COLOR_FG,
-                 text='drawer\n(content varies by state)').pack(expand=True)
-        self._place_drawer()
-
-    def _place_drawer(self):
-        width = DRAWER_W if self._drawer_expanded else HANDLE_W
-        self.drawer.place(x=WINDOW_W - width, y=0,
-                          width=width, height=WINDOW_H)
-        if self._drawer_expanded:
-            self._drawer_content.place(x=1, y=36,
-                                       width=DRAWER_W - 2,
-                                       height=WINDOW_H - 37)
-        else:
-            self._drawer_content.place_forget()
-        self.drawer.lift()
-
     def toggle_drawer(self):
         """Expand or collapse the right drawer."""
-        self._drawer_expanded = not self._drawer_expanded
-        self._toggle_btn.configure(
-            text='>' if self._drawer_expanded else '<')
-        self._place_drawer()
+        self.drawer.toggle()
 
     def set_drawer_page(self, page):
         """Switch drawer content by situation (placeholder, TBD)."""
+        self.drawer.set_page(page)
 
     def close(self):
         """Close the window (Alt+F4 or WM close)."""
