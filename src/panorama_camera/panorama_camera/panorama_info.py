@@ -7,8 +7,40 @@ attributes derived from the panoramic X-to-angle mapping table
 """
 
 from typing import List, Dict, Optional, Tuple
+from collections import OrderedDict
 
 from panorama_camera.coco_names_zh import COCO_NAMES_ZH, get_class_name_zh  # noqa: F401
+
+# ---------------------------------------------------------------------------
+# 8-direction sector definitions (45° each, centred on the cardinal / inter-
+# cardinal directions).  The first sector ("前方") wraps across 0°.
+# ---------------------------------------------------------------------------
+_DIR_SECTORS: List[Tuple[str, Tuple[float, float]]] = [
+    ("前方",   (-22.5,  22.5)),
+    ("左前方", ( 22.5,  67.5)),
+    ("左侧",   ( 67.5, 112.5)),
+    ("左后方", (112.5, 157.5)),
+    ("后方",   (157.5, 202.5)),
+    ("右后方", (202.5, 247.5)),
+    ("右侧",   (247.5, 292.5)),
+    ("右前方", (-67.5,  -22.5)),
+]
+
+
+def _azimuth_in_sector(az: float, lo: float, hi: float) -> bool:
+    """Check whether *az* (0–360) falls inside [*lo*, *hi*).
+
+    Supports negative *lo* / *hi* to express ranges that cross the
+    0° boundary (e.g. 前方: -22.5° ~ 22.5°; 右前方: -67.5° ~ -22.5°).
+    """
+    # Normalise both bounds to 0–360.
+    lo_n = lo % 360.0
+    hi_n = hi % 360.0
+    if lo_n < hi_n:
+        return lo_n <= az < hi_n
+    else:
+        # Wrap-around: range crosses 0° (e.g. 前方: lo_n=337.5, hi_n=22.5).
+        return az >= lo_n or az < hi_n
 
 
 def _interpolate_angle(
@@ -152,3 +184,81 @@ def enrich_detections_with_azimuth(
         enriched.append(entry)
 
     return enriched
+
+
+def build_azimuth_description(
+    detections: List[Dict],
+    use_zh: bool = True,
+) -> str:
+    """Build a human-readable directional summary of panoramic detections.
+
+    Groups detections by their ``azimuth_deg`` attribute into 8
+    cardinal/inter-cardinal sectors (45° each), then produces a
+    Chinese natural-language string listing, per sector, the total
+    object count and a per-class breakdown.
+
+    The eight sectors and their degree ranges are:
+
+    ===========  ==========
+    Direction    Range
+    ===========  ==========
+    前方         -22.5° ~  22.5°
+    左前方        22.5° ~  67.5°
+    左侧          67.5° ~ 112.5°
+    左后方       112.5° ~ 157.5°
+    后方         157.5° ~ 202.5°
+    右后方       202.5° ~ 247.5°
+    右侧         247.5° ~ 292.5°
+    右前方       292.5° ~ 337.5°
+    ===========  ==========
+
+    Example output::
+
+        "前方有3个目标，椅子数量为2，人数量为1；左前方有1个目标，桌子数量为1"
+
+    Args:
+        detections: List of enriched detection dicts (must contain
+            ``azimuth_deg`` and either ``class_name`` or
+            ``class_name_zh``).
+        use_zh: When ``True`` (default), prefer ``class_name_zh``;
+            otherwise fall back to ``class_name``.
+
+    Returns:
+        Formatted description string.  Empty string when no
+        detections have valid azimuth data.
+    """
+    # ── group detections by direction sector ──
+    # OrderedDict preserves the canonical sector order.
+    sectors: Dict[str, List[Dict]] = OrderedDict()
+    for name, _ in _DIR_SECTORS:
+        sectors[name] = []
+
+    for det in detections:
+        az = det.get('azimuth_deg')
+        if az is None:
+            continue
+        for name, (lo, hi) in _DIR_SECTORS:
+            if _azimuth_in_sector(float(az), lo, hi):
+                sectors[name].append(det)
+                break
+
+    # ── build the description string ──
+    parts: List[str] = []
+    for dir_name, dir_dets in sectors.items():
+        if not dir_dets:
+            continue
+
+        total = len(dir_dets)
+
+        # Count per class.
+        class_counts: Dict[str, int] = OrderedDict()
+        for d in dir_dets:
+            cls = (d.get('class_name_zh') if use_zh else None) or d.get('class_name', 'unknown')
+            class_counts[cls] = class_counts.get(cls, 0) + 1
+
+        breakdown = '，'.join(
+            f'{cls}数量为{count}' for cls, count in class_counts.items()
+        )
+        parts.append(f'{dir_name}有{total}个目标，{breakdown}')
+
+    return '；'.join(parts)

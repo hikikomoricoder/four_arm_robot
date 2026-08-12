@@ -1,6 +1,6 @@
 # robot_panel
 
-机器人状态显示与控制面板，tkinter 实现。当前仅完成布局骨架，未接入 ROS 数据。
+机器人状态显示与控制面板，tkinter 实现。已接入 ROS2，通过后台线程订阅全景图话题并在 `PanoramaBlock` 中显示。
 
 ## 界面规格
 
@@ -15,7 +15,7 @@
 | --- | --- | --- | --- |
 | robot_state | (10, 10) | 320×480 | 模块开关、抽屉内容选择、显示设置 |
 | control_commander | (340, 10) | 720×480 | 控制指令区（三区：basic_commander / robot_interact / semantic_commander） |
-| panorama | (340, 500) | 720×240 | 全景图像 |
+| panorama | (340, 500) | 720×240 | 全景图像（ROS2 订阅 `/panorama/annotated`，1/2 尺寸显示） |
 | camera | (10, 500) | 320×240 | 相机图像 |
 | drawer | 右边缘 | 180×750 | 抽屉栏，覆盖于内容之上 |
 
@@ -45,18 +45,47 @@ control_commander 区块（720×480）内部划分为三个子区：
 - 展开：向左覆盖 180×750 区域，点击 `>` 收起（`drawer.lift()` 保证悬浮在最上层）
 - 内容区当前为占位，`set_drawer_page()` 为预留接口，后续按运行状态切换不同页面
 
+## ROS2 集成
+
+- `panel.py` 启动时调用 `rclpy.init()`，关闭时调用 `rclpy.shutdown()`
+- `PanoramaBlock` 在独立后台线程中创建 ROS2 节点 `panorama_display`，订阅 `/panorama/annotated`（`sensor_msgs/Image`），通过 `after(0, ...)` 回到主线程更新 UI
+- `RobotStateBlock.is_panorama_visible()` 同时检查 **Show Panorama** 和 **panorama_concat** 两个条件，`PanoramaBlock` 仅在满足时显示图像
+- 模块开关通过 `subprocess.run(['ros2', 'param', 'set', ...])` 同步到 `display_four_camera` 节点的 ROS2 参数
+
+### 参数同步
+
+| 面板开关 | ROS2 参数 | 默认值 | 依赖关系 |
+| --- | --- | --- | --- |
+| `panorama_concat` | `/display_four_camera/panorama_concat` | False | — |
+| `panorama_detect` | `/display_four_camera/panorama_detect` | False | ON 时强制 `panorama_concat=ON` |
+
+- `panorama_detect` 开启且 `panorama_concat` 未开启时，自动勾选 `panorama_concat` 并同步
+- `panorama_concat` 关闭且 `panorama_detect` 开启时，自动取消 `panorama_detect` 并同步
+- `panorama_concat` 关闭时 **Show Panorama** 无法勾选
+
 ## 代码结构
 
 | 文件 | 类 | 说明 |
 | --- | --- | --- |
-| `panel.py` | `RobotPanel(tk.Tk)` | 主窗口，`BLOCK_LAYOUT` 常量描述四个内容块坐标与类映射 |
-| `robot_state.py` | `RobotStateBlock(tk.Frame)` | 三区控制面板：模块开关、抽屉内容、显示设置 |
+| `panel.py` | `RobotPanel(tk.Tk)` | 主窗口，rclpy 生命周期管理，手动创建各区块并传入依赖 |
+| `robot_state.py` | `RobotStateBlock(tk.Frame)` | 三区控制面板：模块开关（与 ROS2 参数同步）、抽屉内容、显示设置 |
 | `control_commander.py` | `ControlCommanderBlock(tk.Frame)` | 控制指令区块：上 60% 左右对分（basic_commander / robot_interact），下 40% 整块（semantic_commander） |
-| `panorama.py` | `PanoramaBlock(tk.Frame)` | 全景图像区块 |
+| `panorama.py` | `PanoramaBlock(tk.Frame)` | 全景图像区块，后台 ROS2 线程订阅 `/panorama/annotated`，经 PIL 缩放 1/2 后显示 |
 | `camera.py` | `CameraBlock(tk.Frame)` | 相机图像区块 |
 | `drawer.py` | `Drawer(tk.Frame)` | 右侧抽屉栏，自管理展开/收起与内容切换 |
 
 - `setup.py` console_scripts：`robot_panel = robot_panel.panel:main`
+
+## 依赖
+
+`package.xml` 中声明：
+
+- `rclpy` — ROS2 Python 客户端库
+- `sensor_msgs` — 图像消息类型
+- `cv_bridge` — ROS Image ↔ OpenCV 转换
+- `python3-numpy` — 图像数组操作
+- `python3-pil` — PIL.ImageTk 显示
+- `tkinter` — 界面框架
 
 ## 运行
 
@@ -67,7 +96,6 @@ ros2 run robot_panel robot_panel
 
 ## 后续计划
 
-- 接入 rclpy：后台线程 spin，UI 更新经 `after()` 回到主线程
-- robot_state：对接 ROS 服务控制模块开关、抽屉内容切换、显示参数下发
+- robot_state：对接 ROS 服务控制抽屉内容切换、显示参数下发
 - control_commander：调用 commander 接口（veer / wheel / compound 各 mode，panorama_info_broadcast / stereo_distance_broadcast）；semantic_commander 待实现
-- panorama / camera：订阅图像话题，经 PIL.ImageTk 显示
+- camera：订阅图像话题，经 PIL.ImageTk 显示

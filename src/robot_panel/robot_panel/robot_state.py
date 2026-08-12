@@ -1,5 +1,6 @@
 """Robot state display block with module control, drawer content, and display settings."""
 
+import subprocess
 import tkinter as tk
 from tkinter import ttk
 
@@ -42,7 +43,8 @@ class RobotStateBlock(tk.Frame):
                 self, text=name, variable=var,
                 bg=bg, fg=fg, selectcolor=bg,
                 activebackground=bg, activeforeground=fg,
-                anchor='w')
+                anchor='w',
+                command=lambda n=name: self._on_module_toggle(n))
             cb.place(x=16, y=36 + i * 28, width=200, height=22)
             self._module_switches[name] = cb
 
@@ -140,11 +142,52 @@ class RobotStateBlock(tk.Frame):
         self._on_camera_toggle()
 
     # ------------------------------------------------------------------
-    # Callbacks (placeholder – logic will be wired later)
+    # Callbacks
     # ------------------------------------------------------------------
     def _clear_drawer(self):
         """Clear drawer content selection (show nothing)."""
         self._drawer_var.set('')
+
+    def _on_module_toggle(self, name):
+        """Handle module checkbox toggle with dependency enforcement.
+
+        Rules:
+        - panorama_detect ON → panorama_concat must also be ON.
+        - panorama_concat OFF → panorama_detect must also be OFF.
+        """
+        if name == 'panorama_detect':
+            if self._module_vars['panorama_detect'].get():
+                if not self._module_vars['panorama_concat'].get():
+                    self._module_vars['panorama_concat'].set(True)
+                    self._sync_param('panorama_concat', True)
+            self._sync_param('panorama_detect',
+                             self._module_vars['panorama_detect'].get())
+        elif name == 'panorama_concat':
+            if not self._module_vars['panorama_concat'].get():
+                if self._module_vars['panorama_detect'].get():
+                    self._module_vars['panorama_detect'].set(False)
+                    self._sync_param('panorama_detect', False)
+            self._sync_param('panorama_concat',
+                             self._module_vars['panorama_concat'].get())
+            # panorama_concat change may affect Show Panorama validity
+            self._on_panorama_toggle()
+
+    @staticmethod
+    def _sync_param(name, value):
+        """Sync a boolean parameter to the display_four_camera ROS2 node."""
+        try:
+            subprocess.run(
+                ['ros2', 'param', 'set', '/display_four_camera', name,
+                 'true' if value else 'false'],
+                timeout=2.0, capture_output=True)
+        except Exception:
+            pass
+
+    def is_panorama_visible(self):
+        """Return True when Show Panorama is checked AND panorama_concat
+        is enabled.  Used by PanoramaBlock to gate display."""
+        return (self._panorama_var.get() and
+                self._module_vars['panorama_concat'].get())
 
     def _on_panorama_toggle(self):
         """Handle panorama display toggle; block if panorama_concat is off."""

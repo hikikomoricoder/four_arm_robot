@@ -2,6 +2,8 @@
 
 import tkinter as tk
 
+import rclpy
+
 from .camera import CameraBlock
 from .control_commander import ControlCommanderBlock
 from .drawer import Drawer
@@ -38,11 +40,31 @@ class RobotPanel(tk.Tk):
         self.geometry(f'{WINDOW_W}x{WINDOW_H}')
         self._center_on_screen()
 
+        # Init ROS2 before creating subscriber-bearing widgets
+        if not rclpy.ok():
+            rclpy.init()
+
         self.blocks = {}
-        for name, x, y, w, h, cls in BLOCK_LAYOUT:
-            block = cls(self, COLOR_BG, COLOR_FG, COLOR_BORDER)
-            block.place(x=x, y=y, width=w, height=h)
-            self.blocks[name] = block
+
+        # Create robot_state first so panorama can reference it
+        robot_state = RobotStateBlock(self, COLOR_BG, COLOR_FG, COLOR_BORDER)
+        robot_state.place(x=PAD, y=PAD, width=320, height=480)
+        self.blocks['robot_state'] = robot_state
+
+        # Remaining blocks
+        control = ControlCommanderBlock(self, COLOR_BG, COLOR_FG, COLOR_BORDER)
+        control.place(x=PAD + 320 + GAP, y=PAD, width=720, height=480)
+        self.blocks['control_commander'] = control
+
+        panorama = PanoramaBlock(self, COLOR_BG, COLOR_FG, COLOR_BORDER,
+                                 robot_state=robot_state)
+        panorama.place(x=PAD + 320 + GAP, y=PAD + 480 + GAP,
+                       width=720, height=240)
+        self.blocks['panorama'] = panorama
+
+        camera = CameraBlock(self, COLOR_BG, COLOR_FG, COLOR_BORDER)
+        camera.place(x=PAD, y=PAD + 480 + GAP, width=320, height=240)
+        self.blocks['camera'] = camera
 
         self.drawer = Drawer(self, WINDOW_W, WINDOW_H,
                              COLOR_BG, COLOR_FG, COLOR_BORDER)
@@ -86,6 +108,8 @@ class RobotPanel(tk.Tk):
     def close(self):
         """Close the window (Alt+F4 or WM close)."""
         self.destroy()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 def main():

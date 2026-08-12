@@ -13,7 +13,7 @@ import time
 
 from panorama_camera.four_camera_concat import FourCameraStitcher
 from panorama_camera.detect_locate import Yolo11OnnxDetector, Yolo11TrtDetector
-from panorama_camera.panorama_info import enrich_detections_with_azimuth
+from panorama_camera.panorama_info import enrich_detections_with_azimuth, build_azimuth_description
 
 class DisplayFourCamera(Node):
     def __init__(self):
@@ -75,24 +75,22 @@ class DisplayFourCamera(Node):
         self._last_annotated_pano = None
         self._updated_indices = [False] * 4  # all 4 cameras must refresh before stitch
         
-        self.if_det = True
-        self.if_seg = False
+        # Declare ROS2 parameters – both default to False (off).
+        # panorama_concat: controls whether panorama stitching runs.
+        # panorama_detect: controls whether detection + azimuth runs.
+        self.declare_parameter('panorama_concat', False)
+        self.declare_parameter('panorama_detect', False)
 
-        if self.if_det:
-            # model_path = os.path.join(
-            #     os.path.dirname(os.path.abspath(__file__)),
-            #     "../../../../../../model_weights/gazebo_room_coco.onnx"
-            # )
-            # self.detector = Yolo11OnnxDetector(model_path, conf_thres=0.35, iou_thres=0.45,
-            #                             global_iou_thres=self.global_iou_thres,
-            #                             logger=self.get_logger())
-            model_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                "../../../../../../model_weights/gazebo_room_coco.engine"
-            )
-            self.detector = Yolo11TrtDetector(model_path, conf_thres=0.32, iou_thres=0.45,
-                                        global_iou_thres=self.global_iou_thres,
-                                        logger=self.get_logger())
+        # if_imshow: when True, display panorama via cv2.imshow locally
+        self.declare_parameter('if_imshow', False)
+
+        # Publisher for the annotated panorama (consumed by robot_panel)
+        self.pano_pub = self.create_publisher(Image, '/panorama/annotated', 10)
+
+        self.if_azimuth_desc = True   # print directional azimuth description string
+
+        # Detector is created lazily when panorama_detect is first enabled
+        self._detector = None
 
     def image_callback(self, msg, index):
         try:
@@ -107,35 +105,22 @@ class DisplayFourCamera(Node):
             self.get_logger().error(f'Failed to convert image from camera {index + 1}: {e}')
 
     def display_cameras(self):
-        display_imgs = []
-        # for i in range(4):
-        #     if self.images[i] is not None:
-        #         img = self.images[i].copy()
-        #         h, w = img.shape[:2]
-        #         cv2.putText(img, f'Camera {i + 1}', (10, 30),
-        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-        #         display_imgs.append(img)
-        #     else:
-        #         # Show placeholder while waiting for first image
-        #         blank = np.zeros((480, 640, 3), dtype=np.uint8)
-        #         cv2.putText(blank, f'Camera {i + 1} - Waiting...', (10, 30),
-        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-        #         display_imgs.append(blank)
+        # Single canonical display-ready panorama variable.
+        # None when no panorama is available or concat is off.
+        show_pano = None
 
-        # # Arrange 4 cameras in a 2x2 grid
-        # top = np.hstack((display_imgs[0], display_imgs[1]))
-        # bottom = np.hstack((display_imgs[2], display_imgs[3]))
-        # grid = np.vstack((top, bottom))
-
-        # cv2.imshow('Four Camera View', grid)
+        # Read current parameter values at each tick
+        panorama_concat = self.get_parameter('panorama_concat').value
+        panorama_detect = self.get_parameter('panorama_detect').value
 
         # Compute panorama only when all 4 cameras have new data (~1 Hz)
-        if self._images_updated:
+        # AND panorama_concat is enabled
+        if self._images_updated and panorama_concat:
             self._images_updated = False
             t1 = time.time()
             panorama = self.stitcher.stitch(self.images)
             self.get_logger().info('stitch time: {:.2f} ms'.format((time.time() - t1) * 1000))
-            
+
             if panorama is not None:
                 self._last_panorama = panorama
 
@@ -155,26 +140,37 @@ class DisplayFourCamera(Node):
                 t1 = time.time()
                 show_pano = cv2.resize(panorama, (max_w, max_h))
 
-                if self.if_det:
-                    detections = self.detector.detect_panorama(show_pano)
+                if panorama_detect:
+                    # Lazy-load the detector on first use
+                    if self._detector is None:
+                        self._init_detector()
 
-                    # Attach azimuth attributes via the 10° interval table
-                    detections = enrich_detections_with_azimuth(
-                        detections, self._last_intervals,
-                        pano_w=panorama.shape[1], display_w=max_w)
+                    if self._detector is not None:
+                        detections = self._detector.detect_panorama(show_pano)
 
-                    self.get_logger().info(f'Detections: {detections}')
-                    for det in detections:
-                        x1, y1, x2, y2 = det['bbox']
-                        cv2.rectangle(show_pano, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        az = det.get('azimuth_deg')
-                        az_str = f' {az}' if az is not None else ''
-                        label = f"{det['class_name']} {det['score']:.2f} {az_str}"
-                        cv2.putText(
-                            show_pano, label,
-                            (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2,
-                        )
+                        # Attach azimuth attributes via the 10° interval table
+                        detections = enrich_detections_with_azimuth(
+                            detections, self._last_intervals,
+                            pano_w=panorama.shape[1], display_w=max_w)
+
+                        self.get_logger().info(f'Detections: {detections}')
+                        for det in detections:
+                            x1, y1, x2, y2 = det['bbox']
+                            cv2.rectangle(show_pano, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                            az = det.get('azimuth_deg')
+                            az_str = f' {az}' if az is not None else ''
+                            label = f"{det['class_name']} {det['score']:.2f} {az_str}"
+                            cv2.putText(
+                                show_pano, label,
+                                (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2,
+                            )
+
+                        # Print directional azimuth description
+                        if self.if_azimuth_desc:
+                            desc = build_azimuth_description(detections)
+                            if desc:
+                                self.get_logger().info(f'Azimuth description: {desc}')
 
                 # Overlay the 10° intervals as semi-transparent colour
                 # bands (cv2.addWeighted): each band spans two consecutive
@@ -250,9 +246,17 @@ class DisplayFourCamera(Node):
                 self._last_annotated_pano = show_pano
                 self.get_logger().info('det time: {:.2f} ms'.format((time.time() - t1) * 1000))
 
-            # Display the latest result (refreshes window at ~15 Hz even when no new data)
-            if self._last_annotated_pano is not None:
-                cv2.imshow('Panorama', self._last_annotated_pano)
+        # Fall back to cached result when no fresh panorama was computed
+        if show_pano is None:
+            show_pano = self._last_annotated_pano
+
+        # Publish annotated panorama for the robot_panel
+        self._publish_panorama(show_pano)
+
+        # Local imshow (gated by if_imshow parameter, default off)
+        if self.get_parameter('if_imshow').value:
+            if show_pano is not None:
+                cv2.imshow('Panorama', show_pano)
             else:
                 placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
                 status = self.stitcher.get_status()
@@ -265,6 +269,18 @@ class DisplayFourCamera(Node):
                 self.get_logger().info(
                     'Keyboard recompute requested; stitch geometry will be recalculated.')
                 self.stitcher.request_recompute()
+
+    def _publish_panorama(self, cv_image):
+        """Publish the annotated panorama as a ROS Image message.
+
+        When cv_image is None the panel will clear its display.
+        """
+        if cv_image is None:
+            return
+        msg = self.bridge.cv2_to_imgmsg(cv_image, 'bgr8')
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'panorama'
+        self.pano_pub.publish(msg)
 
     @staticmethod
     def _quat_to_rot(q):
@@ -318,6 +334,25 @@ class DisplayFourCamera(Node):
             self._recorded_azimuths = azimuths
             self.axis_angles = [(a - azimuths[0]) % 360.0 for a in azimuths]
             self.stitcher.request_recompute()
+
+    def _init_detector(self):
+        """Lazy-load the TensorRT detector on first use.
+
+        Called once when panorama_detect is first enabled.
+        """
+        model_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "../../../../../../model_weights/gazebo_room_coco.engine"
+        )
+        try:
+            self._detector = Yolo11TrtDetector(
+                model_path, conf_thres=0.32, iou_thres=0.45,
+                global_iou_thres=self.global_iou_thres,
+                logger=self.get_logger())
+            self.get_logger().info('Detector loaded successfully')
+        except Exception as e:
+            self.get_logger().error(f'Failed to load detector: {e}')
+            self._detector = None
 
     def handle_recompute_stitch(self, request, response):
         """ROS service callback to request a recomputation of the stitch geometry."""
