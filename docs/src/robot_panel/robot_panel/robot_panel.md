@@ -13,13 +13,31 @@
 
 | 区块 | 位置 (x, y) | 尺寸 (w×h) | 说明 |
 | --- | --- | --- | --- |
-| robot_state | (10, 10) | 320×480 | 机器人状态显示 |
-| control_commander | (340, 10) | 720×480 | 控制指令区 |
+| robot_state | (10, 10) | 320×480 | 模块开关、抽屉内容选择、显示设置 |
+| control_commander | (340, 10) | 720×480 | 控制指令区（三区：basic_commander / robot_interact / semantic_commander） |
 | panorama | (340, 500) | 720×240 | 全景图像 |
 | camera | (10, 500) | 320×240 | 相机图像 |
 | drawer | 右边缘 | 180×750 | 抽屉栏，覆盖于内容之上 |
 
 尺寸核算：主区 320+10+720=1050（=1070−2×10），纵向 480+10+240=730（=750−2×10）。
+
+### control_commander 内部布局
+
+control_commander 区块（720×480）内部划分为三个子区：
+
+| 子区 | 位置 (x, y) | 尺寸 (w×h) | 说明 |
+| --- | --- | --- | --- |
+| basic_commander | (0, 0) | 360×288 | 上 60% 左半：veer / wheel / compound 各 mode 按钮，底部 speed / duration 输入框 |
+| robot_interact | (360, 0) | 360×288 | 上 60% 右半：panorama_info_broadcast / stereo_distance_broadcast 按钮 |
+| semantic_commander | (0, 288) | 720×192 | 下 40% 整块（当前留空，待后续实现） |
+
+**basic_commander mode 按钮**（均来自 [commander.md](../../robot_commander/commander.md) 各 commander 的 mode）：
+
+- Veer（4 个）：`home`、`forward`、`turn`、`lift`
+- Wheel（3 个）：`forward`、`turn_right`、`turn_left`
+- Compound（5 个）：`home`、`low`、`high`、`rhom_1`、`rhom_2`
+
+底部输入框：`speed`（默认 0.1 m/s）和 `duration`（默认 3.0 s），供各 mode 使用。当前所有按钮均为 UI 占位，未接入功能。
 
 ## 抽屉栏
 
@@ -29,10 +47,15 @@
 
 ## 代码结构
 
-- `src/robot_panel/robot_panel/panel.py`
-  - `RobotPanel(tk.Tk)`：主窗口，`BLOCK_LAYOUT` 常量描述四个内容块坐标
-  - `toggle_drawer()`：抽屉展开/收起
-  - `close()`：Alt+F4 / WM 关闭入口
+| 文件 | 类 | 说明 |
+| --- | --- | --- |
+| `panel.py` | `RobotPanel(tk.Tk)` | 主窗口，`BLOCK_LAYOUT` 常量描述四个内容块坐标与类映射 |
+| `robot_state.py` | `RobotStateBlock(tk.Frame)` | 三区控制面板：模块开关、抽屉内容、显示设置 |
+| `control_commander.py` | `ControlCommanderBlock(tk.Frame)` | 控制指令区块：上 60% 左右对分（basic_commander / robot_interact），下 40% 整块（semantic_commander） |
+| `panorama.py` | `PanoramaBlock(tk.Frame)` | 全景图像区块 |
+| `camera.py` | `CameraBlock(tk.Frame)` | 相机图像区块 |
+| `drawer.py` | `Drawer(tk.Frame)` | 右侧抽屉栏，自管理展开/收起与内容切换 |
+
 - `setup.py` console_scripts：`robot_panel = robot_panel.panel:main`
 
 ## 运行
@@ -45,5 +68,6 @@ ros2 run robot_panel robot_panel
 ## 后续计划
 
 - 接入 rclpy：后台线程 spin，UI 更新经 `after()` 回到主线程
-- robot_state：对接 robot_state_manager 状态服务；control_commander：调用 commander 接口
+- robot_state：对接 ROS 服务控制模块开关、抽屉内容切换、显示参数下发
+- control_commander：调用 commander 接口（veer / wheel / compound 各 mode，panorama_info_broadcast / stereo_distance_broadcast）；semantic_commander 待实现
 - panorama / camera：订阅图像话题，经 PIL.ImageTk 显示
