@@ -187,6 +187,7 @@ right_crop = right_img[:, w - crop_w:] # 右图右侧 40%
 - 过滤掉垂直视差过大的明显错误匹配，减少 RANSAC 的离群点
 - 若过滤后匹配数 `< min_matches`，返回失败
 - **注意**：该先验仅在相机保持近似水平排列时有效。当相机相对位姿改变时，需外部发出 `request_recompute()` 信号重新计算几何
+![特征点匹配图例](../../images/object_distance_estimate.jpg)
 
 #### Step 4: 单应性矩阵估计
 
@@ -284,6 +285,7 @@ stitch() 每帧:
 > `_debug_show_concat` 中间调试窗口仍然在每次 `compute_stitch` 调用时重新计算
 > mask 和 distanceTransform，但该函数仅在几何重算时触发（每秒最多 1–2 次），
 > 不影响正常逐帧路径的性能。
+![拼接图例](../../images/concat_result.jpg)
 
 ### 2.5 方位角 → 全景 X 坐标映射（10° 区间分割）
 

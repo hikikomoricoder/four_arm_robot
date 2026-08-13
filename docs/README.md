@@ -4,21 +4,43 @@
 
 技术栈：C++ / Python 混合编程、ROS 2 Jazzy、Gazebo 仿真、传统图像处理、3D 视觉、目标检测/分割/追踪、ONNX/TRT/RKNN/NCNN 模型转换部署。
 
-## 文档导航
+## 效果图
+![机器人效果图](../../images/robot_picture.jpg)
 
-- [开发环境搭建](env_prepare.md) — 从零搭建开发环境的完整流程
-- [仿真启动流程](launch_flow.md) — Gazebo 仿真启动入口与完整流程
-- [部署说明](deploy.md) — 部署相关说明
+## 控制面板
+![操作界面](../../images/robot_panel.jpg)
 
-## 第三方扩展
+## 开发记录与规划
 
-- [extend 说明](extend/readme.md)
-- [YOLO11s 知识蒸馏方案](extend/ultralytics/distillation.md)
-
-## 源码模块文档
-
-- [四相机水平拼接实现流程](src/panorama_camera/panorama_camera/concat_process.md)
-- [robot_commander 测试指令文档](src/robot_commander/commander.md)
-- [robot_state_manager 状态管理](src/robot_state_manager/robot_state_manager/state_manager.md)
-
-> 项目主页（README）位于仓库根目录 [README.md](../README.md)。
+# 计划第一阶段（模拟）
+- [x] 1.开发环境搭建
+- [x] 2.项目框架搭建
+- [x] 3.写urdf模型
+- [x] 4.gazebo场景搭建
+- [x] 5.urdf中增加gazebo配置
+- [x] 6.相机配置
+- [x] 7.打通流程，写launch文件，跑起来
+- [x] 8.ros2moveit生成controler与问题修复
+- [x] 9.舵轮底盘运动开发测试
+- [x] 10.机械臂组变形开发测试
+- [x] 11.4相机全景拼接
+- [x] 12.yolo11s det和seg转onnx
+- [x] 13.onnx模型推理前后处理实现
+- [x] 14.全景画面目标检测
+- [x] 15.场景适配 finetune or distillation
+- [x] 16.转trt，cuda前后处理与推理
+- [x] 17.全景图目标方位估计
+- [x] 18.接入双目相机检测
+- [x] 19.像素坐标，图像坐标，相机坐标，里程计坐标，世界坐标的转换
+- [x] 20.基于检测结果做距离估计（估计基于分割做才够准确）
+- [ ] 21.tiny-whisper-v2集成
+- [ ] 22.qwen3-0.5B集成
+- [x] 23.MOSS-TTS-Nano集成
+- [ ] 24.语音识别+大语言模型+语音合成联调
+- [ ] 25.拿qwen3 0.5B做自己语料的peft（没条件做模型退化评估）
+- [x] 26.一些事件响应开发测试
+- [x] 27.tkinter做简易控制面板
+- [ ] 28.建图
+- [ ] 29.slam可能先用nav2跑通
+- [ ] 30.4臂控制
+- [ ] 31.34臂控制

@@ -3,6 +3,7 @@
 - [仿真启动流程](launch_flow.md)
 - [部署说明](deploy.md)
 - [机器人结构说明](robot_structure.md)
+- [Gazebo 仿真性能优化](gazebo_performance_optimization.md)
 
 - 第三方扩展
   - [extend 说明](extend/readme.md)
@@ -15,3 +16,4 @@
   - [双目测距](stereo_camera/stereo_camera/stereo_distance_estimate.md)
   - [robot_commander 测试指令文档](src/robot_commander/commander.md)
   - [robot_state_manager 状态管理](src/robot_state_manager/robot_state_manager/state_manager.md)
+  - [robot_panel 控制面板](src/robot_panel/robot_panel/robot_panel.md)

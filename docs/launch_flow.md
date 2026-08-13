@@ -4,6 +4,9 @@
 > 当前入口：[`my_robot_gazebo.launch.xml`](src/my_robot_bringup/launch/my_robot_gazebo.launch.xml)（`<timer period="15.5">` 固定延时 spawn 控制器）
 > 旧入口：`my_robot_gazebo.launch.py`（事件驱动版，已弃用，仅存档参考）
 
+## 当前完全启动后的rqtgraph
+![rqtgraph](../../images/rosgraph.jpg)
+
 ## 1. 启动入口
 
 ```bash

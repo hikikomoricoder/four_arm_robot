@@ -62,6 +62,7 @@ camera_info_corrector（左/右）
             发布标注后的左图 → /stereo_camera/detect_estimate
             （检测+测距由 stereo_estimate 参数控制，默认关闭）
 ```
+![目标测据图例](../../images/object_distance_estimate.jpg)
 
 ### 接口
 
