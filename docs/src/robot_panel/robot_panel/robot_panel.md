@@ -2,6 +2,9 @@
 
 机器人状态显示与控制面板，tkinter 实现。已接入 ROS2，通过后台线程订阅全景图话题并在 `PanoramaBlock` 中显示。
 
+## 界面示意图
+![操作界面](../../images/robot_panel.jpg)
+
 ## 界面规格
 
 - 窗口：1070×750，无边框（`overrideredirect`），启动居中，`Alt+F4` 关闭

@@ -511,6 +511,8 @@ conda install -n four_arm -y numpy numba
 pip install opencv-python opencv-contrib-python
 # 或使用 conda
 # conda install -n four_arm -y -c conda-forge opencv
+# PIL（Pillow，图像处理）
+pip install pillow
 ```
 
 ### 10.4 安装 PyTorch
