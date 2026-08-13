@@ -11,7 +11,12 @@ Pipeline (all launched from my_robot_gazebo.launch.xml):
         * time-syncs the left image (/camera_5/image_raw) with /disparity
         * runs YOLO11 TensorRT detection on the left image (single frame)
         * estimates the metric distance of every detection from the disparity
-        * displays the annotated left frame and the right frame
+        * publishes the annotated left frame on /stereo_camera/detect_estimate
+
+Detection + ranging are gated by the ``stereo_estimate`` parameter (default
+False, toggled from the robot panel).  The TensorRT engine itself is loaded
+once at startup regardless, so enabling the switch later incurs no load
+delay.
 
 The detector reuses panorama_camera.detect_locate.Yolo11TrtDetector which
 wraps the CUDA-accelerated Yolo11DetTrt extension.  For stereo ranging we
@@ -20,14 +25,13 @@ sub-image splitting).
 """
 
 import os
-import threading
 
 import cv2
 import message_filters
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
+from rclpy.callback_groups import ReentrantCallbackGroup
 from sensor_msgs.msg import Image
 from stereo_msgs.msg import DisparityImage
 from cv_bridge import CvBridge, CvBridgeError
@@ -70,8 +74,11 @@ class StereoCameraProcessor(Node):
         self.declare_parameter("focal_length", 381.3)
         self.declare_parameter("baseline", 0.08)
         self.declare_parameter("left_image_topic", "/camera_5/image_raw")
-        self.declare_parameter("right_image_topic", "/camera_6/image_raw")
         self.declare_parameter("disparity_topic", "/disparity")
+        # Gates detection + ranging (default off, toggled from the robot
+        # panel).  The TensorRT engine still loads below, so enabling the
+        # switch later incurs no load delay.
+        self.declare_parameter("stereo_estimate", False)
 
         model_path = self.get_parameter("model_path").value
         conf_thres = self.get_parameter("conf_thres").value
@@ -79,7 +86,6 @@ class StereoCameraProcessor(Node):
         focal_length = self.get_parameter("focal_length").value
         baseline = self.get_parameter("baseline").value
         left_topic = self.get_parameter("left_image_topic").value
-        right_topic = self.get_parameter("right_image_topic").value
         disp_topic = self.get_parameter("disparity_topic").value
 
         # --- Detector (TensorRT / CUDA) ---------------------------------
@@ -95,14 +101,12 @@ class StereoCameraProcessor(Node):
         )
 
         self.bridge_left = CvBridge()
-        self.bridge_right = CvBridge()
         self.frame_counter = 0
 
         # --- Callback groups --------------------------------------------
         # ReentrantCallbackGroup for the two message_filters subscribers so
-        # they can run concurrently; a separate group for the right camera.
+        # they can run concurrently.
         self.sync_callback_group = ReentrantCallbackGroup()
-        self.right_callback_group = MutuallyExclusiveCallbackGroup()
 
         # --- Time sync: left image + disparity --------------------------
         # ApproximateTimeSynchronizer only fires when the two frames have
@@ -122,23 +126,19 @@ class StereoCameraProcessor(Node):
         )
         self.time_sync.registerCallback(self.synchronized_callback)
 
-        # --- Right camera: display only ---------------------------------
-        self.subscription_right = self.create_subscription(
-            Image, right_topic, self.right_callback, 10,
-            callback_group=self.right_callback_group,
+        # --- Result publisher (replaces the former cv2.imshow GUI) -------
+        # Annotated left frame, published every synced frame so remote
+        # displays (e.g. the robot panel) can subscribe and render it.
+        self.estimate_pub = self.create_publisher(
+            Image, "/stereo_camera/detect_estimate", 10,
         )
-
-        # Display frames written by callbacks, read by the GUI thread.
-        self.display_left = None
-        self.display_right = None
-        self.display_lock = threading.Lock()
 
         self.get_logger().info(
             "StereoCameraProcessor started:\n"
-            f"  left    : {left_topic}\n"
-            f"  right   : {right_topic}\n"
+            f"  left     : {left_topic}\n"
             f"  disparity: {disp_topic}\n"
-            f"  engine  : {model_path}\n"
+            f"  engine   : {model_path}\n"
+            f"  publish  : /stereo_camera/detect_estimate\n"
             f"  fx={focal_length:.1f} px, baseline={baseline:.3f} m"
         )
 
@@ -152,70 +152,53 @@ class StereoCameraProcessor(Node):
             )
             self.frame_counter += 1
 
-            # Update the estimator with the disparity aligned to this frame.
-            self.distance_estimator.update_disparity(disparity_msg)
+            # Detection + ranging run only while stereo_estimate is on
+            # (default off, toggled from the robot panel).  The engine is
+            # already loaded at startup, so there is no load delay here.
+            if self.get_parameter("stereo_estimate").value:
+                # Update the estimator with the disparity aligned to this frame.
+                self.distance_estimator.update_disparity(disparity_msg)
 
-            cv2.putText(
-                cv_image, "frame_num " + str(self.frame_counter),
-                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2,
-            )
+                # Single-frame TensorRT detection on the left image.
+                detections = self.detector.detect_single(cv_image)
 
-            # Single-frame TensorRT detection on the left image.
-            detections = self.detector.detect_single(cv_image)
-
-            for det in detections:
-                x1, y1, x2, y2 = det['bbox']
-                distance = self.distance_estimator.estimate_distance(
-                    (x1, y1, x2, y2)
-                )
-
-                cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                label = f"{det['class_name']} {det['score']:.2f}"
-                if distance is not None:
-                    label += f" {distance:.2f}m"
-                else:
-                    label += " dist:N/A"
-                cv2.putText(
-                    cv_image, label, (x1, max(y1 - 10, 15)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2,
-                )
-
-            if detections:
-                self.get_logger().info(
-                    "Detections: " + ", ".join(
-                        f"{d['class_name']} "
-                        f"{self.distance_estimator.estimate_distance(tuple(d['bbox'])) or float('nan'):.2f}m"
-                        for d in detections
+                for det in detections:
+                    x1, y1, x2, y2 = det['bbox']
+                    distance = self.distance_estimator.estimate_distance(
+                        (x1, y1, x2, y2)
                     )
-                )
 
-            with self.display_lock:
-                self.display_left = cv_image.copy()
+                    cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    label = f"{det['class_name']} {det['score']:.2f}"
+                    if distance is not None:
+                        label += f" {distance:.2f}m"
+                    else:
+                        label += " dist:N/A"
+                    cv2.putText(
+                        cv_image, label, (x1, max(y1 - 10, 15)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2,
+                    )
+
+                if detections:
+                    self.get_logger().info(
+                        "Detections: " + ", ".join(
+                            f"{d['class_name']} "
+                            f"{self.distance_estimator.estimate_distance(tuple(d['bbox'])) or float('nan'):.2f}m"
+                            for d in detections
+                        )
+                    )
+
+            # Publish the annotated frame regardless of stereo_estimate so
+            # remote displays always have a live feed; bounding boxes and
+            # distances only appear while the switch is enabled.
+            out_msg = self.bridge_left.cv2_to_imgmsg(cv_image, encoding="bgr8")
+            out_msg.header = img_msg.header
+            self.estimate_pub.publish(out_msg)
 
         except CvBridgeError as e:
             self.get_logger().error(f"CvBridge Error in synchronized_callback: {e}")
         except Exception as e:
             self.get_logger().error(f"Error in synchronized_callback: {e}")
-
-    # ------------------------------------------------------------------
-    # Right camera: display only
-    # ------------------------------------------------------------------
-    def right_callback(self, msg: Image):
-        try:
-            cv_image = self.bridge_right.imgmsg_to_cv2(
-                msg, desired_encoding="bgr8"
-            )
-            cv2.putText(
-                cv_image, "camera_6 (right)",
-                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2,
-            )
-            with self.display_lock:
-                self.display_right = cv_image.copy()
-
-        except CvBridgeError as e:
-            self.get_logger().error(f"CvBridge Error in right_callback: {e}")
-        except Exception as e:
-            self.get_logger().error(f"Error in right_callback: {e}")
 
 
 def main(args=None):
@@ -223,31 +206,16 @@ def main(args=None):
     node = StereoCameraProcessor()
 
     # The sync callback group needs 2 concurrent threads (left + disparity
-    # filter subscribers) and the right camera needs 1 more.
-    executor = MultiThreadedExecutor(num_threads=4)
+    # filter subscribers).
+    executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(node)
 
-    # cv2 GUI must run on the main thread; spin the executor in the background.
-    executor_thread = threading.Thread(target=executor.spin, daemon=True)
-    executor_thread.start()
-
     try:
-        while rclpy.ok():
-            with node.display_lock:
-                left = node.display_left.copy() if node.display_left is not None else None
-                right = node.display_right.copy() if node.display_right is not None else None
-            if left is not None:
-                cv2.imshow("Stereo Left (camera_5) + Detection", left)
-            if right is not None:
-                cv2.imshow("Stereo Right (camera_6)", right)
-            cv2.waitKey(1)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
-        executor.shutdown()
-        executor_thread.join(timeout=2.0)
         node.destroy_node()
-        cv2.destroyAllWindows()
         rclpy.shutdown()
 
 

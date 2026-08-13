@@ -1,7 +1,8 @@
 """Camera image display block with ROS2 subscription.
 
-Subscribes to a selectable /camera_N/image_raw topic, downscales
-the image to 1/2 resolution, and displays it at a user-configurable
+Subscribes to a selectable /camera_N/image_raw topic (or, for the
+'stereo' selection, /stereo_camera/detect_estimate), downscales the
+image to 1/2 resolution, and displays it at a user-configurable
 refresh rate controlled by RobotStateBlock.
 """
 
@@ -12,6 +13,7 @@ import numpy as np
 from PIL import Image as PILImage, ImageTk
 
 import rclpy
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
@@ -21,7 +23,8 @@ class CameraBlock(tk.Frame):
     """Displays a single camera feed at 1/2 resolution.
 
     Camera selection, visibility (Show Camera), and refresh rate
-    are read from the RobotStateBlock on every display tick.
+    are read from the RobotStateBlock on every display tick.  The
+    'stereo' selection is gated by the stereo_estimate module switch.
     """
 
     def __init__(self, parent, bg, fg, border, robot_state=None):
@@ -72,13 +75,19 @@ class CameraBlock(tk.Frame):
             rclpy.init()
         self._ros_node = Node('camera_display')
         self._ros_ready.set()
-        rclpy.spin(self._ros_node)
+        # Dedicated executor: rclpy.spin() would share the process-global
+        # SingleThreadedExecutor with the panorama thread, and concurrent
+        # spin_once() calls on it raise "generator already executing".
+        self._executor = SingleThreadedExecutor()
+        self._executor.add_node(self._ros_node)
+        self._executor.spin()
 
     def _ensure_subscription(self, camera_name):
         """Create or switch the ROS2 subscription for the given camera.
 
         Args:
-            camera_name: e.g. 'camera1' → subscribes to /camera_1/image_raw.
+            camera_name: e.g. 'camera1' → subscribes to /camera_1/image_raw;
+                         'stereo' → subscribes to /stereo_camera/detect_estimate.
         """
         if self._sub is not None and self._current_camera == camera_name:
             return  # already subscribed — nothing to do
@@ -89,9 +98,13 @@ class CameraBlock(tk.Frame):
             self._sub = None
             self._latest_msg = None
 
-        # Map camera1 → /camera_1/image_raw
-        idx = camera_name.replace('camera', '')
-        topic = f'/camera_{idx}/image_raw'
+        # Map camera1 → /camera_1/image_raw; 'stereo' is the annotated
+        # detection + ranging view published by stereo_camera_processor.
+        if camera_name == 'stereo':
+            topic = '/stereo_camera/detect_estimate'
+        else:
+            idx = camera_name.replace('camera', '')
+            topic = f'/camera_{idx}/image_raw'
         self._ros_node.get_logger().info(f'CameraBlock subscribing to {topic}')
         self._sub = self._ros_node.create_subscription(
             Image, topic, self._on_camera_msg, 10)
@@ -149,9 +162,13 @@ class CameraBlock(tk.Frame):
         if self._ros_node is not None:
             self._ensure_subscription(selected)
 
-        # Display the latest received frame
-        if self._latest_msg is not None:
+        # Display the latest received frame.  The stereo view only shows a
+        # picture while the stereo_estimate module switch is enabled.
+        stereo_enabled = self._robot_state._module_vars['stereo_estimate'].get()
+        if self._latest_msg is not None and (selected != 'stereo' or stereo_enabled):
             self._handle_frame()
+        elif selected == 'stereo' and not stereo_enabled:
+            self._clear()
 
         # Parse refresh rate and schedule the next tick
         try:

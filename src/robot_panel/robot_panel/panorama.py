@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image as PILImage, ImageTk
 
 import rclpy
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
@@ -64,7 +65,12 @@ class PanoramaBlock(tk.Frame):
         self._ros_node.create_subscription(
             Image, '/panorama/annotated', self._on_panorama_msg, 10)
         self._ros_ready.set()
-        rclpy.spin(self._ros_node)
+        # Dedicated executor: rclpy.spin() would share the process-global
+        # SingleThreadedExecutor with the camera thread, and concurrent
+        # spin_once() calls on it raise "generator already executing".
+        self._executor = SingleThreadedExecutor()
+        self._executor.add_node(self._ros_node)
+        self._executor.spin()
 
     def _on_panorama_msg(self, msg):
         """ROS callback (background thread): schedule UI update on main."""

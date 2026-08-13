@@ -26,7 +26,7 @@ ros2 launch my_robot_bringup my_robot_gazebo.launch.xml
 | 可视化 | `rviz2` | 加载 `urdf_config.rviz`（use_sim_time） |
 | 运动规划 | `move_group_gazebo.launch.py`（robot_moveit_config） | MoveIt move_group（use_sim_time） |
 | 状态管理 | `robot_state_manager/state_manager` | 提供 `/group_state_manager` 服务（组状态 get_all/get_group/set_group） |
-| 全景 | `panorama_camera/display_four_camera` | 四相机拼接全景显示 |
+| 全景 | `panorama_camera/display_four_camera` | 四相机拼接全景显示（启动时预加载 TensorRT 检测引擎，`panorama_detect` 开启时无加载延迟） |
 | 双目 | `camera_info_corrector` ×2 | 修正 Gazebo camera_info 的 Tx（右相机 = -fx·baseline） |
 | 双目 | `stereo_image_proc/disparity_node` | 计算视差图 `/disparity` |
 | 双目 | `stereo_camera/stereo_camera_processor` | TensorRT 目标检测 + 立体测距 + 显示 |

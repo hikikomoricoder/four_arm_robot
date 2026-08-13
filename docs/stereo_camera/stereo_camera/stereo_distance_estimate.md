@@ -59,8 +59,23 @@ camera_info_corrector（左/右）
             时间同步左图 + /disparity
             在左图上运行 YOLO11 TensorRT 检测
             对每个检测框估算距离
-            显示标注后的左右视图
+            发布标注后的左图 → /stereo_camera/detect_estimate
+            （检测+测距由 stereo_estimate 参数控制，默认关闭）
 ```
+
+### 接口
+
+- **输出话题**：`/stereo_camera/detect_estimate`（`sensor_msgs/Image`）
+  - 每帧时间同步后发布标注左图，含检测框与距离标注
+  - `stereo_estimate` 关闭时仍发布原始左图（含帧计数器），仅不含检测标注
+- **控制参数**：`/stereo_camera_processor/stereo_estimate`（`bool`，默认 `false`）
+  - 通过 `robot_panel` 面板 Module Control → `stereo_estimate` 复选框控制
+  - 开启时在左图上运行 YOLO11 TensorRT 检测 + 双目测距
+  - 关闭时跳过检测与测距，仅发布原始左图
+  - TensorRT 检测引擎在节点启动时即加载，切换开关无延迟
+- **面板显示**：在 `robot_panel` 的 Camera 下拉框中选择 `stereo`，即可查看标注结果
+  - 需同时勾选 **Show Camera** 和 `stereo_estimate` 模块开关
+  - 关闭 `stereo_estimate` 时，`stereo` 画面显示占位文字
 
 ## 3. 测距算法
 

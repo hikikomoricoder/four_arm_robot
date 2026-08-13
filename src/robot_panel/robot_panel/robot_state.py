@@ -114,7 +114,9 @@ class RobotStateBlock(tk.Frame):
         camera_label.place(x=32, y=sec3_y + 28 + 28 + 28, width=60, height=22)
 
         self._camera_choice = tk.StringVar(value='camera1')
-        camera_options = [f'camera{i}' for i in range(1, 7)]
+        # 'stereo' shows the stereo_camera_processor's annotated view
+        # (/stereo_camera/detect_estimate); it needs stereo_estimate ON.
+        camera_options = [f'camera{i}' for i in range(1, 7)] + ['stereo']
         self._camera_combo = ttk.Combobox(
             self, textvariable=self._camera_choice,
             values=camera_options, state='readonly', width=10)
@@ -155,6 +157,8 @@ class RobotStateBlock(tk.Frame):
         Rules:
         - panorama_detect ON → panorama_concat must also be ON.
         - panorama_concat OFF → panorama_detect must also be OFF.
+        - stereo_estimate has no dependencies; it toggles detection +
+          ranging on the stereo_camera_processor node.
         """
         if name == 'panorama_detect':
             if self._module_vars['panorama_detect'].get():
@@ -172,13 +176,18 @@ class RobotStateBlock(tk.Frame):
                              self._module_vars['panorama_concat'].get())
             # panorama_concat change may affect Show Panorama validity
             self._on_panorama_toggle()
+        elif name == 'stereo_estimate':
+            self._sync_param('stereo_estimate',
+                             self._module_vars['stereo_estimate'].get(),
+                             node='/stereo_camera_processor')
 
     @staticmethod
-    def _sync_param(name, value):
-        """Sync a boolean parameter to the display_four_camera ROS2 node."""
+    def _sync_param(name, value, node='/display_four_camera'):
+        """Sync a boolean parameter to a ROS2 node (default:
+        display_four_camera)."""
         try:
             subprocess.run(
-                ['ros2', 'param', 'set', '/display_four_camera', name,
+                ['ros2', 'param', 'set', node, name,
                  'true' if value else 'false'],
                 timeout=2.0, capture_output=True)
         except Exception:
