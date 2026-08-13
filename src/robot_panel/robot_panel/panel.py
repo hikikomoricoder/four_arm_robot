@@ -62,9 +62,13 @@ class RobotPanel(tk.Tk):
                        width=720, height=240)
         self.blocks['panorama'] = panorama
 
-        camera = CameraBlock(self, COLOR_BG, COLOR_FG, COLOR_BORDER)
+        camera = CameraBlock(self, COLOR_BG, COLOR_FG, COLOR_BORDER,
+                             robot_state=robot_state)
         camera.place(x=PAD, y=PAD + 480 + GAP, width=320, height=240)
         self.blocks['camera'] = camera
+
+        # Let robot_state control the camera block
+        robot_state.set_camera_block(camera)
 
         self.drawer = Drawer(self, WINDOW_W, WINDOW_H,
                              COLOR_BG, COLOR_FG, COLOR_BORDER)

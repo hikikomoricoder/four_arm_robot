@@ -24,6 +24,7 @@ class RobotStateBlock(tk.Frame):
         self._bg = bg
         self._fg = fg
         self._border = border
+        self._camera_block = None
 
         # ------------------------------------------------------------------
         # Section 1: Module Control
@@ -124,7 +125,7 @@ class RobotStateBlock(tk.Frame):
             self, text='Refresh (Hz):', bg=bg, fg=fg, anchor='w')
         refresh_label.place(x=16, y=sec3_y + 28 + 28 + 28 + 36, width=100, height=22)
 
-        self._refresh_var = tk.StringVar(value='30')
+        self._refresh_var = tk.StringVar(value='10')
         refresh_options = ['10', '15', '20', '30', '60']
         self._refresh_combo = ttk.Combobox(
             self, textvariable=self._refresh_var,
@@ -197,7 +198,15 @@ class RobotStateBlock(tk.Frame):
         else:
             self._hint_label.config(text='')
 
+    def set_camera_block(self, camera_block):
+        """Register the CameraBlock so that Show Camera can control it."""
+        self._camera_block = camera_block
+
     def _on_camera_toggle(self):
-        """Handle camera display toggle."""
-        # placeholder for future logic
-        pass
+        """Handle camera display toggle – start or stop the camera feed."""
+        if self._camera_block is None:
+            return
+        if self._camera_var.get():
+            self._camera_block.start_display()
+        else:
+            self._camera_block.stop_display()

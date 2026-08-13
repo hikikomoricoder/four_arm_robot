@@ -16,7 +16,7 @@
 | robot_state | (10, 10) | 320×480 | 模块开关、抽屉内容选择、显示设置 |
 | control_commander | (340, 10) | 720×480 | 控制指令区（三区：basic_commander / robot_interact / semantic_commander） |
 | panorama | (340, 500) | 720×240 | 全景图像（ROS2 订阅 `/panorama/annotated`，1/2 尺寸显示） |
-| camera | (10, 500) | 320×240 | 相机图像 |
+| camera | (10, 500) | 320×240 | 相机图像（ROS2 订阅 `/camera_N/image_raw`，1/2 尺寸显示） |
 | drawer | 右边缘 | 180×750 | 抽屉栏，覆盖于内容之上 |
 
 尺寸核算：主区 320+10+720=1050（=1070−2×10），纵向 480+10+240=730（=750−2×10）。
@@ -49,8 +49,10 @@ control_commander 区块（720×480）内部划分为三个子区：
 
 - `panel.py` 启动时调用 `rclpy.init()`，关闭时调用 `rclpy.shutdown()`
 - `PanoramaBlock` 在独立后台线程中创建 ROS2 节点 `panorama_display`，订阅 `/panorama/annotated`（`sensor_msgs/Image`），通过 `after(0, ...)` 回到主线程更新 UI
+- `CameraBlock` 在独立后台线程中创建 ROS2 节点 `camera_display`，动态订阅 `/camera_N/image_raw`（`sensor_msgs/Image`），通过主线程定时器按配置刷新率更新 UI，图像缩放至 1/2 后显示
 - `RobotStateBlock.is_panorama_visible()` 同时检查 **Show Panorama** 和 **panorama_concat** 两个条件，`PanoramaBlock` 仅在满足时显示图像
 - 模块开关通过 `subprocess.run(['ros2', 'param', 'set', ...])` 同步到 `display_four_camera` 节点的 ROS2 参数
+- `RobotStateBlock.set_camera_block()` 注册 `CameraBlock` 引用，**Show Camera** 勾选时调用 `start_display()` 启动显示循环，取消时调用 `stop_display()` 销毁订阅并清理画面
 
 ### 参数同步
 
@@ -71,7 +73,7 @@ control_commander 区块（720×480）内部划分为三个子区：
 | `robot_state.py` | `RobotStateBlock(tk.Frame)` | 三区控制面板：模块开关（与 ROS2 参数同步）、抽屉内容、显示设置 |
 | `control_commander.py` | `ControlCommanderBlock(tk.Frame)` | 控制指令区块：上 60% 左右对分（basic_commander / robot_interact），下 40% 整块（semantic_commander） |
 | `panorama.py` | `PanoramaBlock(tk.Frame)` | 全景图像区块，后台 ROS2 线程订阅 `/panorama/annotated`，经 PIL 缩放 1/2 后显示 |
-| `camera.py` | `CameraBlock(tk.Frame)` | 相机图像区块 |
+| `camera.py` | `CameraBlock(tk.Frame)` | 相机图像区块，后台 ROS2 线程订阅所选 `/camera_N/image_raw`，经 PIL 缩放 1/2 后按刷新率显示 |
 | `drawer.py` | `Drawer(tk.Frame)` | 右侧抽屉栏，自管理展开/收起与内容切换 |
 
 - `setup.py` console_scripts：`robot_panel = robot_panel.panel:main`
@@ -94,8 +96,16 @@ colcon build --packages-select robot_panel
 ros2 run robot_panel robot_panel
 ```
 
+## 显示设置
+
+### Show Camera（相机显示）
+
+- **Show Camera** 勾选时，`CameraBlock` 启动显示循环，订阅所选相机话题 `/camera_N/image_raw`，图像缩放至 1/2 后显示在 320×240 区块中
+- **Show Camera** 取消时，销毁 ROS2 订阅并清理画面，恢复为占位文字
+- **Camera** 下拉框：选择 `camera1`～`camera6`（对应话题 `/camera_1/image_raw`～`/camera_6/image_raw`），切换时自动销毁旧订阅并创建新订阅
+- **Refresh (Hz)** 下拉框：控制相机画面刷新率，可选 10 / 15 / 20 / 30 / 60 Hz，默认 10 Hz
+
 ## 后续计划
 
 - robot_state：对接 ROS 服务控制抽屉内容切换、显示参数下发
 - control_commander：调用 commander 接口（veer / wheel / compound 各 mode，panorama_info_broadcast / stereo_distance_broadcast）；semantic_commander 待实现
-- camera：订阅图像话题，经 PIL.ImageTk 显示
