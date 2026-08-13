@@ -5,10 +5,10 @@
 技术栈：C++ / Python 混合编程、ROS 2 Jazzy、Gazebo 仿真、传统图像处理、3D 视觉、目标检测/分割/追踪、ONNX/TRT/RKNN/NCNN 模型转换部署。
 
 ## 效果图
-![机器人效果图](../../images/robot_picture.jpg)
+![机器人效果图](./images/robot_picture.jpg)
 
 ## 控制面板
-![操作界面](../../images/robot_panel.jpg)
+![操作界面](./images/robot_panel.jpg)
 
 ## 开发记录与规划
 
