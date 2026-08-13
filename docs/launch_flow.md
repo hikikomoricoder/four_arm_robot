@@ -5,7 +5,7 @@
 > 旧入口：`my_robot_gazebo.launch.py`（事件驱动版，已弃用，仅存档参考）
 
 ## 当前完全启动后的rqtgraph
-![rqtgraph](../../images/rosgraph.jpg)
+![rqtgraph](./images/rosgraph.jpg)
 
 ## 1. 启动入口
 
