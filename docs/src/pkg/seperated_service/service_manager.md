@@ -2,7 +2,7 @@
 
 `seperated_service` 包节点（`service_manager.py`），两大职责：
 
-1. **外部服务进程管理**：按 JSON 配置启动 / 健康检查 / 自动重启独立于 ROS2 的服务进程（当前为 MOSS-TTS-Nano，端口 18083）。详见 [extend 文档](../../extend/seperated_service/service_manager.md)
+1. **外部服务进程管理**：按 JSON 配置启动 / 健康检查 / 自动重启独立于 ROS2 的服务进程（当前为 MOSS-TTS-Nano，端口 18083）。详见 [extend 文档](../../../extend/seperated_service/service_manager.md)
 2. **系统 TTS 网关**：订阅 `/tts/say`，经 MOSS-TTS-Nano HTTP 接口合成语音并播放
 
 ## TTS 网关

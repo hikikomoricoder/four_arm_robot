@@ -382,7 +382,7 @@ d = |L_low − L_home| = 0.67 − 0.4884 = 0.1816 m
 
 **low**
 
-![low 姿态示意图（四臂下沉）](../../images/arm_low_position.jpg)
+![low 姿态示意图（四臂下沉）](../../../images/arm_low_position.jpg)
 
 - 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, -pi/4, +pi/2, -pi/4]`
   - `arm_joint_3_x` 转 `-pi/4`（-45°）
@@ -394,7 +394,7 @@ d = |L_low − L_home| = 0.67 − 0.4884 = 0.1816 m
 
 **high**
 
-![high 姿态示意图（四臂上抬）](../../images/arm_high_position.jpg)
+![high 姿态示意图（四臂上抬）](../../../images/arm_high_position.jpg)
 
 - 每臂偏移 `[j1, j3, j5, j7]`（控制器顺序，四臂相同）：`[0, +pi/8, -pi/4, +pi/8]`
   - `arm_joint_3_x` 转 `+pi/8`（+22.5°）

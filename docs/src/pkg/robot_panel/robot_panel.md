@@ -34,7 +34,7 @@ control_commander 区块（720×480）内部划分为三个子区：
 | robot_interact | (360, 0) | 360×288 | 上 60% 右半：panorama_info_broadcast（已接入 TTS 播报）/ stereo_distance_broadcast（占位）按钮 |
 | semantic_commander | (0, 288) | 720×192 | 下 40% 整块（当前留空，待后续实现） |
 
-**basic_commander mode 按钮**（均来自 [commander.md](../../robot_commander/commander.md) 各 commander 的 mode）：
+**basic_commander mode 按钮**（均来自 [commander.md](../robot_commander/commander.md) 各 commander 的 mode）：
 
 - Veer（4 个）：`home`、`forward`、`turn`、`lift`
 - Wheel（3 个）：`forward`、`turn_right`、`turn_left`
@@ -56,7 +56,7 @@ control_commander 区块（720×480）内部划分为三个子区：
 - `RobotStateBlock.is_panorama_visible()` 同时检查 **Show Panorama** 和 **panorama_concat** 两个条件，`PanoramaBlock` 仅在满足时显示图像
 - 模块开关通过 `subprocess.run(['ros2', 'param', 'set', ...])` 同步到 `display_four_camera` 节点的 ROS2 参数；`stereo_estimate` 同步到 `/stereo_camera_processor` 节点
 - `RobotStateBlock.set_camera_block()` 注册 `CameraBlock` 引用，**Show Camera** 勾选时调用 `start_display()` 启动显示循环，取消时调用 `stop_display()` 销毁订阅并清理画面
-- `ControlCommanderBlock` 在独立后台线程中创建 ROS2 节点 `control_commander`（独立 `SingleThreadedExecutor`）：`get_azimuth_description`（`std_srvs/Trigger`）client + `/tts/say`（`std_msgs/String`）发布者。点击 **panorama_info_broadcast** 异步拉取 `display_four_camera` 缓存的最新方位描述并发布到 `/tts/say`，由 `service_manager` 的 TTS 网关播报（链路见 [service_manager](../../serivce_manager/service_manager.md)）；服务不可用或暂无描述时仅记日志
+- `ControlCommanderBlock` 在独立后台线程中创建 ROS2 节点 `control_commander`（独立 `SingleThreadedExecutor`）：`get_azimuth_description`（`std_srvs/Trigger`）client + `/tts/say`（`std_msgs/String`）发布者。点击 **panorama_info_broadcast** 异步拉取 `display_four_camera` 缓存的最新方位描述并发布到 `/tts/say`，由 `service_manager` 的 TTS 网关播报（链路见 [service_manager](../seperated_service/service_manager.md)）；服务不可用或暂无描述时仅记日志
 
 ### 参数同步
 
