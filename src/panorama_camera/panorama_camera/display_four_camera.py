@@ -48,6 +48,9 @@ class DisplayFourCamera(Node):
         self.stitcher = FourCameraStitcher()
         self.recompute_service = self.create_service(
             Trigger, 'recompute_stitch', self.handle_recompute_stitch)
+        self.desc_service = self.create_service(
+            Trigger, 'get_azimuth_description',
+            self.handle_get_azimuth_description)
 
         # --- TF-based camera azimuth monitoring (1 Hz) ---
         # Each camera's optical-axis azimuth is read from TF; when any
@@ -88,9 +91,12 @@ class DisplayFourCamera(Node):
         self.pano_pub = self.create_publisher(Image, '/panorama/annotated', 10)
 
         self.if_azimuth_desc = True   # print directional azimuth description string
+        self._latest_desc = None      # newest description; pulled by the panel
 
-        # Detector is created lazily when panorama_detect is first enabled
+        # Detector (TensorRT engine) is loaded once at startup so that
+        # enabling panorama_detect later incurs no load delay.
         self._detector = None
+        self._init_detector()
 
     def image_callback(self, msg, index):
         try:
@@ -141,11 +147,14 @@ class DisplayFourCamera(Node):
                 show_pano = cv2.resize(panorama, (max_w, max_h))
 
                 if panorama_detect:
-                    # Lazy-load the detector on first use
+                    # Detector is already loaded at startup; if the engine
+                    # failed to load, detection is skipped with a warning.
                     if self._detector is None:
-                        self._init_detector()
-
-                    if self._detector is not None:
+                        self.get_logger().warn(
+                            'Detector unavailable (engine failed to load at '
+                            'startup); detection skipped',
+                            throttle_duration_sec=10.0)
+                    else:
                         detections = self._detector.detect_panorama(show_pano)
 
                         # Attach azimuth attributes via the 10° interval table
@@ -170,6 +179,7 @@ class DisplayFourCamera(Node):
                         if self.if_azimuth_desc:
                             desc = build_azimuth_description(detections)
                             if desc:
+                                self._latest_desc = desc
                                 self.get_logger().info(f'Azimuth description: {desc}')
 
                 # Overlay the 10° intervals as semi-transparent colour
@@ -336,9 +346,10 @@ class DisplayFourCamera(Node):
             self.stitcher.request_recompute()
 
     def _init_detector(self):
-        """Lazy-load the TensorRT detector on first use.
+        """Load the TensorRT detector.
 
-        Called once when panorama_detect is first enabled.
+        Called once at startup so that enabling panorama_detect later
+        does not introduce a load delay.
         """
         model_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
@@ -359,6 +370,16 @@ class DisplayFourCamera(Node):
         self.stitcher.request_recompute()
         response.success = True
         response.message = 'Stitch geometry recomputation requested.'
+        return response
+
+    def handle_get_azimuth_description(self, request, response):
+        """Return the newest azimuth description (for on-demand TTS broadcast)."""
+        if self._latest_desc:
+            response.success = True
+            response.message = self._latest_desc
+        else:
+            response.success = False
+            response.message = 'No azimuth description available yet.'
         return response
 
 

@@ -8,12 +8,19 @@ auto-restarts on failure.
 The service definition is read from a JSON config file. The JSON must contain a
 top-level ``"seperated_service"`` key whose value is an array of service objects,
 each with: name, conda_env, work_dir, cmd, args, check_port, check_keyword.
+
+The node also acts as the system-wide TTS gateway: text published on the
+``/tts/say`` topic (std_msgs/String) is spoken through the managed
+MOSS-TTS-Nano service. Utterances are queued latest-wins (depth 1) so
+out-of-date speech is discarded instead of piling up.
 """
 
 import json
 import os
+import queue
 import signal
 import subprocess
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -21,6 +28,7 @@ from typing import List, Optional
 
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import String
 
 
 @dataclass
@@ -50,7 +58,7 @@ class ServiceManager(Node):
             value="",
         )
         self.declare_parameter("check_interval", value=10.0)
-        self.declare_parameter("startup_delay", value=2.0)
+        self.declare_parameter("startup_delay", value=18.0)
 
         cfg_path = self.get_parameter("config_file").value
         check_interval = self.get_parameter("check_interval").value
@@ -75,6 +83,17 @@ class ServiceManager(Node):
 
         # --- periodic health check ---
         self.create_timer(check_interval, self._health_check)
+
+        # --- TTS gateway: /tts/say -> managed TTS service ---
+        # The subscription callback only enqueues; a worker thread performs
+        # the seconds-long blocking synthesis + playback so the executor's
+        # timers (health check etc.) are never stalled.
+        self._tts_queue: queue.Queue = queue.Queue(maxsize=1)
+        self._tts_stop = threading.Event()
+        self._tts_client = self._make_tts_client(cfg_path)
+        self._tts_thread = threading.Thread(target=self._tts_worker, daemon=True)
+        self._tts_thread.start()
+        self.create_subscription(String, "tts/say", self._on_tts_say, 10)
 
     # ------------------------------------------------------------------
     # Config loading
@@ -128,6 +147,57 @@ class ServiceManager(Node):
         self._startup_timer.cancel()
         for svc in self._svc_defs:
             self._start_service(svc)
+
+    # ------------------------------------------------------------------
+    # TTS gateway
+    # ------------------------------------------------------------------
+
+    def _make_tts_client(self, cfg_path: str):
+        """Create a TTSClient bound to the same JSON config that defines the
+        managed service (``tts_request.py`` lives next to that config file)."""
+        if cfg_path and os.path.isfile(cfg_path):
+            module_dir = os.path.dirname(os.path.abspath(cfg_path))
+            config_path = cfg_path
+        else:
+            module_dir = "/home/dcx/four_arm_robot/extend/moss_tts_nano"
+            config_path = os.path.join(module_dir, "tts_config.json")
+        if module_dir not in sys.path:
+            sys.path.insert(0, module_dir)
+        try:
+            from tts_request import TTSClient
+            client = TTSClient(config_path=config_path)
+        except Exception as e:
+            self.get_logger().error(f"TTS gateway disabled: {e}")
+            return None
+        self.get_logger().info(f"TTS gateway ready ({client.server_url})")
+        return client
+
+    def _on_tts_say(self, msg: String):
+        """Enqueue an utterance; a stale queued one is dropped (latest-wins)."""
+        text = msg.data.strip()
+        if not text:
+            return
+        if self._tts_queue.full():
+            try:
+                self._tts_queue.get_nowait()
+            except queue.Empty:
+                pass
+        self._tts_queue.put_nowait(text)
+
+    def _tts_worker(self):
+        """Consume queued utterances and play them through the TTS service."""
+        while not self._tts_stop.is_set():
+            try:
+                text = self._tts_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if self._tts_client is None:
+                self.get_logger().warn("TTS request dropped: client unavailable")
+                continue
+            try:
+                self._tts_client.synthesize_and_play(text)
+            except Exception as e:
+                self.get_logger().warn(f"TTS playback failed: {e}")
 
     # ------------------------------------------------------------------
     # Port / process helpers
@@ -273,6 +343,9 @@ class ServiceManager(Node):
 
     def destroy_node(self):
         self.get_logger().info("Shutting down — terminating managed services ...")
+        self._tts_stop.set()
+        if self._tts_thread.is_alive():
+            self._tts_thread.join(timeout=1.0)
         for svc in self._svc_defs:
             proc = svc.process
             if proc is not None and proc.poll() is None:

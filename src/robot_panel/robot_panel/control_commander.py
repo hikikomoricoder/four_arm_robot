@@ -1,6 +1,13 @@
 """Control commander block with basic, interact, and semantic sections."""
 
+import threading
 import tkinter as tk
+
+import rclpy
+from rclpy.executors import SingleThreadedExecutor
+from rclpy.node import Node
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 # Known block dimensions from panel.py BLOCK_LAYOUT
 BLOCK_W = 720
@@ -64,6 +71,12 @@ class ControlCommanderBlock(tk.Frame):
             highlightthickness=1)
         self._semantic_frame.place(x=0, y=TOP_H, width=BLOCK_W, height=BOT_H)
         self._build_semantic_commander(self._semantic_frame)
+
+        # ROS2 interface for the robot_interact broadcast buttons
+        self._ros_node = None
+        self._ros_ready = threading.Event()
+        self._ros_thread = threading.Thread(target=self._ros_spin, daemon=True)
+        self._ros_thread.start()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -195,12 +208,69 @@ class ControlCommanderBlock(tk.Frame):
         btn_w = iw - PAD_X * 6
         btn_x = PAD_X * 3
 
-        self._make_btn(parent, 'panorama_info_broadcast',
-                       btn_x, y, btn_w)
+        pano_btn = self._make_btn(parent, 'panorama_info_broadcast',
+                                  btn_x, y, btn_w)
+        pano_btn.config(command=self._on_panorama_broadcast)
         y += BTN_H + 16
 
         self._make_btn(parent, 'stereo_distance_broadcast',
                        btn_x, y, btn_w)
+
+    # ------------------------------------------------------------------
+    # ROS2 interface (background thread)
+    # ------------------------------------------------------------------
+    def _ros_spin(self):
+        """Create the ROS2 node: TTS publisher + azimuth description client."""
+        if not rclpy.ok():
+            rclpy.init()
+        self._ros_node = Node('control_commander')
+        self._tts_pub = self._ros_node.create_publisher(String, '/tts/say', 10)
+        self._desc_client = self._ros_node.create_client(
+            Trigger, 'get_azimuth_description')
+        self._ros_ready.set()
+        # Dedicated executor per spinning thread (see PanoramaBlock).
+        self._executor = SingleThreadedExecutor()
+        self._executor.add_node(self._ros_node)
+        self._executor.spin()
+
+    # ------------------------------------------------------------------
+    # Button handlers (main thread)
+    # ------------------------------------------------------------------
+    def _on_panorama_broadcast(self):
+        """Speak the latest panorama azimuth description once via TTS."""
+        if not self._ros_ready.is_set():
+            return
+        if not self._desc_client.service_is_ready():
+            self._ros_node.get_logger().warn(
+                'get_azimuth_description unavailable — '
+                'is display_four_camera running?')
+            return
+        future = self._desc_client.call_async(Trigger.Request())
+        future.add_done_callback(self._on_desc_response)
+
+    def _on_desc_response(self, future):
+        """Service done callback (executor thread): forward text to TTS."""
+        try:
+            resp = future.result()
+        except Exception as e:
+            self._ros_node.get_logger().warn(
+                f'Azimuth description request failed: {e}')
+            return
+        if not resp.success or not resp.message:
+            self._ros_node.get_logger().info(
+                f'Nothing to broadcast ({resp.message})')
+            return
+        self._tts_pub.publish(String(data=resp.message))
+        self._ros_node.get_logger().info(f'Broadcasting: {resp.message}')
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+    def destroy(self):
+        """Shut down the ROS2 node before destroying the widget."""
+        if self._ros_node is not None:
+            self._ros_node.destroy_node()
+        super().destroy()
 
     # ------------------------------------------------------------------
     # semantic_commander (bottom)
