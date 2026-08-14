@@ -17,3 +17,4 @@
   - [robot_commander 测试指令文档](src/robot_commander/commander.md)
   - [robot_state_manager 状态管理](src/robot_state_manager/robot_state_manager/state_manager.md)
   - [robot_panel 控制面板](src/robot_panel/robot_panel/robot_panel.md)
+  - [service_manager 源码与 TTS 网关](src/serivce_manager/service_manager.md)
