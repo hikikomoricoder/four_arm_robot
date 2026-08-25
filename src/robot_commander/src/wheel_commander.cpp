@@ -323,6 +323,112 @@ bool WheelCommander::turnLeftWithSpeed(double linear_speed, double duration)
 }
 
 // ============================================================================
+//  turnByAngle
+// ============================================================================
+
+bool WheelCommander::turnByAngle(double turn_angle_deg, double linear_speed)
+{
+  if (turn_angle_deg == 0.0) {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] turnByAngle: angle is 0 deg, nothing to do");
+    return true;
+  }
+  if (linear_speed <= 0.0) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] turnByAngle: linear speed must be > 0 (got %.3f)",
+                 linear_speed);
+    return false;
+  }
+
+  // ---- Pre-check (get_all): veer turn/free, arm home/free, wheel free ----
+  if (!state_manager_client_->wait_for_service(std::chrono::seconds(3))) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] group_state_manager service not available");
+    return false;
+  }
+
+  auto get_req = std::make_shared<robot_interfaces::srv::GroupStateManager::Request>();
+  get_req->command = "get_all";
+
+  auto get_future = state_manager_client_->async_send_request(get_req);
+  if (rclcpp::spin_until_future_complete(node_, get_future) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] Failed to call group_state_manager (get_all)");
+    return false;
+  }
+
+  auto get_resp = get_future.get();
+  if (!get_resp->success) {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[WheelCommander] get_all failed: %s", get_resp->message.c_str());
+    return false;
+  }
+
+  if (get_resp->veer_position != "turn") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] veer position is '%s' (not 'turn'), cannot turn",
+                get_resp->veer_position.c_str());
+    return false;
+  }
+  if (get_resp->veer_status != "free") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] veer status is '%s' (not 'free'), cannot turn",
+                get_resp->veer_status.c_str());
+    return false;
+  }
+  if (get_resp->arm_position != "home") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] arm position is '%s' (not 'home'), cannot turn",
+                get_resp->arm_position.c_str());
+    return false;
+  }
+  if (get_resp->arm_status != "free") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] arm status is '%s' (not 'free'), cannot turn",
+                get_resp->arm_status.c_str());
+    return false;
+  }
+  if (get_resp->wheel_status != "free") {
+    RCLCPP_WARN(node_->get_logger(),
+                "[WheelCommander] wheel status is '%s' (not 'free'), cannot turn",
+                get_resp->wheel_status.c_str());
+    return false;
+  }
+
+  // ---- Reserve wheel: position=turn, status=occupy -----------------------
+  if (!reserveWheel("turn")) {
+    return false;
+  }
+
+  // ---- Turn kinematics (home pose, see TURN_RADIUS in the header) --------
+  //   body yaw  = ground speed * duration / TURN_RADIUS
+  //   duration  = |angle| * TURN_RADIUS / ground speed
+  // Positive wheel speeds rotate the robot clockwise (right turn), so a
+  // positive (counter-clockwise / left) angle needs negative speeds.
+  const double angle_rad = turn_angle_deg * M_PI / 180.0;
+  const double duration = std::abs(angle_rad) * TURN_RADIUS / linear_speed;
+  const double ground_speed = (turn_angle_deg > 0.0) ? -linear_speed : linear_speed;
+  const double angular_vel = ground_speed / WHEEL_RADIUS;
+
+  RCLCPP_INFO(node_->get_logger(),
+              "[WheelCommander] turnByAngle: %.1f deg @ %.3f m/s -> all wheels "
+              "@ %+.3f rad/s for %.2f s (turn radius %.4f m)",
+              turn_angle_deg, linear_speed, angular_vel, duration, TURN_RADIUS);
+
+  const std::vector<double> velocities = {
+    angular_vel,   // wheel_joint_4
+    angular_vel,   // wheel_joint_3
+    angular_vel,   // wheel_joint_2
+    angular_vel    // wheel_joint_1
+  };
+  bool ok = driveWithVelocities(velocities, duration);
+  releaseWheel();
+  return ok;
+}
+
+// ============================================================================
 //  driveForward
 // ============================================================================
 

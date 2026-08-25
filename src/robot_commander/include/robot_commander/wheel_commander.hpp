@@ -6,6 +6,7 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <robot_interfaces/srv/group_state_manager.hpp>
 #include <chrono>
+#include <cmath>
 #include <map>
 #include <memory>
 #include <string>
@@ -25,6 +26,7 @@ namespace robot_commander
  *   wc.driveForward(0.1, 1.0);        // differential forward
  *   wc.turnRightWithSpeed(0.1, 1.0);  // turn right in place
  *   wc.turnLeftWithSpeed(0.1, 1.0);   // turn left in place
+ *   wc.turnByAngle(90.0, 0.1);        // turn in place by a given angle
  *
  * Linear speed (m/s) is converted internally to angular velocity (rad/s)
  * using the wheel radius (0.04 m).
@@ -40,6 +42,25 @@ class WheelCommander
 public:
   /** Wheel radius from far_common_properties.xml.xacro */
   static constexpr double WHEEL_RADIUS = 0.04;  // meters
+
+  /**
+   * Adjacent arm-base separation in the home pose (m), derived from the
+   * URDF exactly like CompoundCommander's baseSeparation(0, 0) — see
+   * docs/src/pkg/robot_commander/commander.md:
+   *   L = group_joint x-offset + J3->J5 link * sin(pi/4)
+   *                          + J5->J7 link * sin(3*pi/4)
+   *     = 0.05 + 0.31 * sqrt(2)  ≈ 0.4884 m
+   */
+  static constexpr double HOME_BASE_SEPARATION = 0.05 + 0.31 * M_SQRT2;
+
+  /**
+   * In-place turn radius (m): in the home pose the four coplanar arm bases
+   * (each carrying one veer + wheel) form a square of side
+   * HOME_BASE_SEPARATION, each rotated 90° in yaw from its neighbour, so
+   * the yaw axis is the square centre and every wheel contact point is at
+   * radius L / sqrt(2).  Body yaw rate = wheel ground speed / TURN_RADIUS.
+   */
+  static constexpr double TURN_RADIUS = HOME_BASE_SEPARATION / M_SQRT2;
 
   /**
    * @param node  A fully initialised rclcpp node (use_sim_time and other
@@ -92,6 +113,29 @@ public:
    * @return true on success.
    */
   bool turnLeftWithSpeed(double linear_speed = 0.1, double duration = 1.0);
+
+  /**
+   * @brief Turn in place by a specified angle.
+   *
+   * The duration is derived from the turn geometry so that the body yaws
+   * by the requested angle:
+   *   duration = |angle| * TURN_RADIUS / linear_speed
+   * Positive wheel speeds rotate the robot clockwise, therefore a positive
+   * angle turns counter-clockwise (left, +yaw) and a negative angle turns
+   * clockwise (right, -yaw).
+   *
+   * Pre-checks (single get_all): veer position must be "turn", veer status
+   * "free", arm position "home", arm status "free" and wheel status "free".
+   * Reserves the "wheel" group via /group_state_manager (position "turn",
+   * status "occupy") before moving and releases it (status "free") after
+   * the movement completes.
+   *
+   * @param turn_angle_deg  Desired body yaw change in degrees
+   *                        (positive = counter-clockwise / left).
+   * @param linear_speed    Wheel ground speed (m/s), default 0.1.
+   * @return true on success.
+   */
+  bool turnByAngle(double turn_angle_deg, double linear_speed = 0.1);
 
   /**
    * @brief Differential steering: wheel_joint_1,2 forward,
