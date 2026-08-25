@@ -84,10 +84,13 @@ ros2 run robot_commander veer_commander_test <mode> [duration]
 运行命令：
 
 ```bash
-ros2 run robot_commander wheel_command <mode> [speed] [duration]
-#   mode      'forward' | 'turn_right_speed' | 'turn_left_speed'
-#   speed     线速度（m/s），默认 0.1
-#   duration  运动时长（秒），默认 1.0
+ros2 run robot_commander wheel_commander_test <mode> [args...]
+#   forward / turn_right_speed / turn_left_speed:
+#     speed     线速度（m/s），默认 0.1
+#     duration  运动时长（秒），默认 1.0
+#   turn_angle:
+#     angle     转向角度（度），正 = 逆时针（左转），负 = 顺时针（右转），默认 90
+#     speed     线速度（m/s），默认 0.1；时长由角度自动推导
 ```
 
 设 `w = linear_speed / 0.04`（rad/s），例如 `linear_speed = 0.1` 时 `w = 2.5 rad/s`。
@@ -97,6 +100,7 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 | `forward` | `driveForward(speed, duration)` | j1=`+w`, j2=`+w`, j3=`-w`, j4=`-w` | 差速前进：1,2 正转，3,4 反转 |
 | `turn_right_speed` | `turnRightWithSpeed(speed, duration)` | j1=`+w`, j2=`+w`, j3=`+w`, j4=`+w` | 所有轮同向同速转动，原地右转 |
 | `turn_left_speed` | `turnLeftWithSpeed(speed, duration)` | j1=`-w`, j2=`-w`, j3=`-w`, j4=`-w` | 所有轮同向同速反向转动，原地左转 |
+| `turn_angle` | `turnByAngle(angle, speed)` | j1~j4 = `±w`（四轮同向） | 原地转过指定角度，时长由角度与转弯半径推导 |
 
 ### 各 mode 细节
 
@@ -115,6 +119,12 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 > - `veer` 的 `status` 必须为 `"free"`
 > 任一条件不满足则拒绝执行（不发布速度命令）。veer 本身不会被锁定。
 
+> **`turn_angle` 前置检查（单次 `get_all`）**：在锁定 wheel 之前要求：
+> - `veer` position = `"turn"`，status = `"free"`
+> - `arm` position = `"home"`，status = `"free"`（转弯半径按 home 构型推导）
+> - `wheel` status = `"free"`
+> 任一条件不满足则拒绝执行。veer / arm 本身不会被锁定。
+
 **forward**
 - 发布速度向量（控制器顺序 `[j4, j3, j2, j1]`）：`[-w, -w, +w, +w]`
   - `wheel_joint_1` = `+w`（正转）
@@ -132,6 +142,21 @@ ros2 run robot_commander wheel_command <mode> [speed] [duration]
 - 发布速度向量（控制器顺序 `[j4, j3, j2, j1]`）：`[-w, -w, -w, -w]`
   - 四个轮均为 `-w`（同向同速，与 `turn_right_speed` 方向相反）
 - 持续 `duration` 后停止（发布 `[0, 0, 0, 0]`）
+
+**turn_angle**
+- 转弯半径（home 构型，结构推导同第 4 节）：四个 base 共面构成边长
+  `L_home = 0.05 + 0.31·√2 ≈ 0.4884 m` 的正方形，转轴为正方形中心：
+  ```
+  R_turn = L_home / √2 = 0.31 + 0.05/√2 ≈ 0.3454 m
+  ```
+- 时长由角度反解（机体 yaw 角速度 = 线速度 / R_turn）：
+  ```
+  duration = |angle_rad| · R_turn / speed
+  ```
+- 方向约定：轮正转 = 顺时针（右转）。角度正值（逆时针 / 左转，+yaw）→
+  四轮 `-w`；负值 → 四轮 `+w`。
+- 锁定 wheel（position = `turn`，status = `occupy`）后发布速度，
+  持续 `duration` 停止并释放 wheel（status = `free`）。
 
 ---
 

@@ -30,17 +30,36 @@ control_commander 区块（720×480）内部划分为三个子区：
 
 | 子区 | 位置 (x, y) | 尺寸 (w×h) | 说明 |
 | --- | --- | --- | --- |
-| basic_commander | (0, 0) | 360×288 | 上 60% 左半：veer / wheel / compound 各 mode 按钮，底部 speed / duration 输入框 |
+| basic_commander | (0, 0) | 360×288 | 上 60% 左半：veer / wheel / compound 各 mode 按钮（已接入指令下发），底部 speed / duration 输入框 |
 | robot_interact | (360, 0) | 360×288 | 上 60% 右半：panorama_info_broadcast（已接入 TTS 播报）/ stereo_distance_broadcast（占位）按钮 |
 | semantic_commander | (0, 288) | 720×192 | 下 40% 整块（当前留空，待后续实现） |
 
-**basic_commander mode 按钮**（均来自 [commander.md](../robot_commander/commander.md) 各 commander 的 mode）：
+**basic_commander mode 按钮**（均来自 [commander.md](../robot_commander/commander.md) 各 commander 的 mode，均已接入指令下发）：
 
 - Veer（4 个）：`home`、`forward`、`turn`、`lift`
-- Wheel（3 个）：`forward`、`turn_right`、`turn_left`
+- Wheel（4 个）：`forward`、`turn_right`、`turn_left`、`turn_angle`
 - Compound（5 个）：`home`、`low`、`high`、`rhom_1`、`rhom_2`
 
-底部输入框：`speed`（默认 0.1 m/s）和 `duration`（默认 3.0 s），供各 mode 使用。当前所有按钮均为 UI 占位，未接入功能。
+**按钮 → 指令映射**：按钮在后台线程中以 `subprocess.run(['ros2', 'run', 'robot_commander', ...])` 调用对应 commander 测试可执行文件（退出码非 0 时经 ROS 日志告警），指令组合参照已单独验证过的 `scripts/commander_group.py`：
+
+| 按钮（显示名） | 实际下发指令 | 参数来源 |
+| --- | --- | --- |
+| Veer `home` / `forward` / `turn` / `lift` | `veer_commander_test <mode> <duration>` | duration 输入框 |
+| Wheel `forward` | `wheel_commander_test forward <speed> <duration>` | speed + duration 输入框 |
+| Wheel `turn_right`（→ `turn_right_speed`） | `wheel_commander_test turn_right_speed <speed> <duration>` | speed + duration 输入框 |
+| Wheel `turn_left`（→ `turn_left_speed`） | `wheel_commander_test turn_left_speed <speed> <duration>` | speed + duration 输入框 |
+| Wheel `turn_angle` | `wheel_commander_test turn_angle <angle>` | speed 输入框复用为角度（deg）输入 |
+| Compound `home` / `low` / `high` | `compound_commander_test <mode> <duration>` | duration 输入框 |
+| Compound `rhom_1` / `rhom_2`（→ `rhombus_1` / `rhombus_2`） | `compound_commander_test <mode> <duration>` | duration 输入框 |
+
+- 按钮显示名为短名（适应按钮宽度），下发时映射为 commander 实际 mode 名（`turn_right_speed`、`turn_left_speed`、`rhombus_1`、`rhombus_2`）
+- Veer / Compound 仅使用 duration；Wheel 的 `forward` / `turn_right` / `turn_left` 使用 speed + duration
+- `turn_angle` 的角度从 **speed 输入框**读取（该框在 turn_angle 模式下复用为角度输入），时长由角度与转弯半径推导
+- 输入框数值解析失败（非数字）时不下发指令，仅经 ROS 日志告警
+
+底部输入框：`speed`（默认 0.1 m/s）和 `duration`（默认 3.0 s），供各 mode 使用。
+
+**输入框键盘焦点（X11）**：面板为无边框窗口（`overrideredirect`），Tk 的 `focus_force()` 在该场景下只更新 Tk 内部状态、不设置真实 X 输入焦点，导致输入框无法键入。`control_commander.py` 提供模块级 `_x_force_focus()`：点击输入框时经 `ctypes` 直接调用 libX11 的 `XSetInputFocus`（懒加载 `libX11.so.6` 并持有独立 Display 连接）设置真实键盘焦点，同时保留 `focus_force()` 以维持 Tk 内部焦点状态；非 X11 平台加载失败时自动退化为纯 Tk 行为。
 
 ## 抽屉栏
 
@@ -57,6 +76,7 @@ control_commander 区块（720×480）内部划分为三个子区：
 - 模块开关通过 `subprocess.run(['ros2', 'param', 'set', ...])` 同步到 `display_four_camera` 节点的 ROS2 参数；`stereo_estimate` 同步到 `/stereo_camera_processor` 节点
 - `RobotStateBlock.set_camera_block()` 注册 `CameraBlock` 引用，**Show Camera** 勾选时调用 `start_display()` 启动显示循环，取消时调用 `stop_display()` 销毁订阅并清理画面
 - `ControlCommanderBlock` 在独立后台线程中创建 ROS2 节点 `control_commander`（独立 `SingleThreadedExecutor`）：`get_azimuth_description`（`std_srvs/Trigger`）client + `/tts/say`（`std_msgs/String`）发布者。点击 **panorama_info_broadcast** 异步拉取 `display_four_camera` 缓存的最新方位描述并发布到 `/tts/say`，由 `service_manager` 的 TTS 网关播报（链路见 [service_manager](../seperated_service/service_manager.md)）；服务不可用或暂无描述时仅记日志
+- basic_commander 各按钮不走 ROS2 节点，而是在各自的临时后台线程中以 `subprocess.run(['ros2', 'run', 'robot_commander', ...])` 调用 commander 测试可执行文件（指令组合见上文映射表），UI 线程不阻塞；退出码非 0 或进程异常时经 `control_commander` 节点日志告警
 
 ### 参数同步
 
@@ -78,7 +98,7 @@ control_commander 区块（720×480）内部划分为三个子区：
 | --- | --- | --- |
 | `panel.py` | `RobotPanel(tk.Tk)` | 主窗口，rclpy 生命周期管理，手动创建各区块并传入依赖 |
 | `robot_state.py` | `RobotStateBlock(tk.Frame)` | 三区控制面板：模块开关（与 ROS2 参数同步）、抽屉内容、显示设置 |
-| `control_commander.py` | `ControlCommanderBlock(tk.Frame)` | 控制指令区块：上 60% 左右对分（basic_commander / robot_interact），下 40% 整块（semantic_commander）；panorama_info_broadcast 已接入 ROS2 播报 |
+| `control_commander.py` | `ControlCommanderBlock(tk.Frame)` | 控制指令区块：上 60% 左右对分（basic_commander / robot_interact），下 40% 整块（semantic_commander）；basic_commander 各按钮已接入 commander 指令下发，输入框经 `_x_force_focus()` 解决无边框窗口键盘焦点；panorama_info_broadcast 已接入 ROS2 播报 |
 | `panorama.py` | `PanoramaBlock(tk.Frame)` | 全景图像区块，后台 ROS2 线程订阅 `/panorama/annotated`，经 PIL 缩放 1/2 后显示 |
 | `camera.py` | `CameraBlock(tk.Frame)` | 相机图像区块，后台 ROS2 线程订阅所选 `/camera_N/image_raw`（`stereo` 时订阅 `/stereo_camera/detect_estimate`），经 PIL 缩放 1/2 后按刷新率显示 |
 | `drawer.py` | `Drawer(tk.Frame)` | 右侧抽屉栏，自管理展开/收起与内容切换 |
@@ -118,4 +138,4 @@ ros2 run robot_panel robot_panel
 ## 后续计划
 
 - robot_state：对接 ROS 服务控制抽屉内容切换、显示参数下发
-- control_commander：basic_commander 各 mode 按钮、stereo_distance_broadcast、semantic_commander 待实现（panorama_info_broadcast 已接入 TTS 播报）
+- control_commander：stereo_distance_broadcast、semantic_commander 待实现（basic_commander 各 mode 按钮已接入指令下发，panorama_info_broadcast 已接入 TTS 播报）
