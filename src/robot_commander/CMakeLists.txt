@@ -89,6 +89,24 @@ set_target_properties(compound_commander_lib PROPERTIES
 )
 target_link_options(compound_commander_lib PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
 
+add_library(mobile_base_commander_lib SHARED
+  src/mobile_base_commander.cpp
+)
+target_include_directories(mobile_base_commander_lib PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>"
+)
+ament_target_dependencies(mobile_base_commander_lib
+  rclcpp rclcpp_action control_msgs sensor_msgs std_msgs robot_interfaces)
+# Plain signature to stay compatible with ament_target_dependencies above.
+target_link_libraries(mobile_base_commander_lib
+  veer_commander_lib wheel_commander_lib)
+# Same sibling-library RUNPATH reasoning as compound_commander_lib.
+set_target_properties(mobile_base_commander_lib PROPERTIES
+  INSTALL_RPATH "\$ORIGIN"
+)
+target_link_options(mobile_base_commander_lib PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
+
 # ── Executable ────────────────────────────────────────────────────
 add_executable(wheel_commander_test
   src/wheel_commander_test.cpp
@@ -140,17 +158,30 @@ set_target_properties(compound_commander_test PROPERTIES
 )
 target_link_options(compound_commander_test PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
 
+add_executable(mobile_base_commander_test
+  src/mobile_base_commander_test.cpp
+)
+ament_target_dependencies(mobile_base_commander_test
+  rclcpp rclcpp_action control_msgs sensor_msgs std_msgs)
+target_link_libraries(mobile_base_commander_test mobile_base_commander_lib)
+set_target_properties(mobile_base_commander_test PROPERTIES
+  INSTALL_RPATH "\$ORIGIN"
+)
+target_link_options(mobile_base_commander_test PRIVATE "-Wl,-rpath-link,/usr/lib/x86_64-linux-gnu")
+
 # ── Install ────────────────────────────────────────────────────────
 install(TARGETS
   wheel_commander_lib
   veer_commander_lib
   arm_commander_lib
   compound_commander_lib
+  mobile_base_commander_lib
   test_moveit
   wheel_commander_test
   veer_commander_test
   arm_commander_test
   compound_commander_test
+  mobile_base_commander_test
   EXPORT ${PROJECT_NAME}Targets
   DESTINATION lib/${PROJECT_NAME}/
 )

@@ -1,7 +1,8 @@
 # robot_commander 测试指令文档
 
 本文档记录 `wheel_commander_test.cpp`、`veer_commander_test.cpp`、
-`arm_commander_test.cpp` 与 `compound_commander_test.cpp` 中各 `mode`
+`arm_commander_test.cpp`、`compound_commander_test.cpp` 与
+`mobile_base_commander_test.cpp` 中各 `mode`
 对应的关节控制目标（目标位置 / 运动速度）。
 
 ---
@@ -447,3 +448,70 @@ d = |L_low − L_home| = 0.67 − 0.4884 = 0.1816 m
   - `arm_joint_1_4` = `+pi/4`
 - 偏移步时长：`max(duration, 2.0)` s
 - wheel 运动距离 `d = 0` → 轮保持静止
+
+---
+
+## 5. mobile_base_commander_test.cpp（移动底盘，相对位置移动）
+
+- 控制对象：4 个 veer 转向关节（经 `VeerCommander`，`veer_controller` action）
+  + 4 个驱动轮（经 `WheelCommander`，`/wheel_controller/commands` 速度控制）
+- 功能：运动到**相对于当前位置**的指定目标点 `(x, y)`（机器人当前机体系：
+  `x` 向前、`y` 向左，单位 m）。运动分解为两段：
+  1. **原地转向**到目标方位 `theta = atan2(y, x)`（正值 = 逆时针 / 左转，
+     与 `turnByAngle` 约定一致）；
+  2. **直行**距离 `d = hypot(x, y)` 到达目标。
+- 各阶段均复用现有子指令，子指令各自维持与 `/group_state_manager` 的
+  occupy/free 锁定闭环（veer 组由 `VeerCommander` 锁定 / 释放，
+  wheel 组由 `WheelCommander` 锁定 / 释放），`MobileBaseCommander`
+  只做整体前置检查、阶段编排与收尾恢复。
+
+运行命令：
+
+```bash
+ros2 run robot_commander mobile_base_commander_test <x> <y> [speed]
+#   x       前向位移（m），必填
+#   y       左向位移（m），必填（负值 = 右）
+#   speed   线速度（m/s），默认 0.1；原地转向与直行共用该速度
+```
+
+例：`ros2 run robot_commander mobile_base_commander_test 0.5 0.3`
+（向前 0.5 m、向左 0.3 m 的点，先转 `atan2(0.3, 0.5) ≈ 31°` 再直行约 0.583 m）。
+
+### 执行流程细节
+
+#### 前置检查（单次 `get_all`）
+
+开始前向 `/group_state_manager` 发送 `get_all`，仅当以下条件**全部满足**才执行：
+- `arm` position = `"home"`
+- `arm` status = `"free"`
+- `veer` status = `"free"`（不限制 veer position，veer 构型由本指令自行切换）
+- `wheel` status = `"free"`
+
+任一条件不满足则拒绝执行（不产生任何运动）。另：`speed <= 0` 直接报错；
+`(x, y) = (0, 0)` 视为无需运动，直接返回成功。
+
+#### 阶段 1：原地转向（`theta != 0` 时）
+
+1. `veer_commander_.setTurnState()` — 四个 veer 关节到 `+pi/4`（turn 构型），
+   锁定并释放 veer 组（position = `turn`）。
+2. `wheel_commander_.turnByAngle(theta_deg, speed)` — 原地转过 `theta`；
+   其内部前置检查（veer position = `turn`、arm home/free、wheel free）
+   由上一步与整体前置检查保证通过。时长由角度与转弯半径自动推导：
+   `duration = |theta_rad| · R_turn / speed`（`R_turn ≈ 0.3454 m`，见第 2 节）。
+
+`|theta| < 1e-3°`（目标正前方）时整个阶段跳过（不切换 veer 构型）。
+阶段失败时对 veer 做尽力而为的 `setHomeState()` 恢复并返回失败。
+
+#### 阶段 2：直行到目标
+
+1. `veer_commander_.setForwardState()` — 先回 home 再施加前进偏移
+   （j2/j4 → `-pi/2`，见第 1 节），锁定并释放 veer 组（position = `forward`）。
+2. `wheel_commander_.driveForward(speed, d / speed)` — 差速前进，
+   时长由距离反解：`duration = d / speed`。
+
+阶段失败时同样对 veer 做尽力而为的恢复并返回失败。
+
+#### 收尾：恢复 veer home
+
+两段运动完成后调用 `veer_commander_.setHomeState()` 将转向关节恢复到
+URDF 零位（中立构型），其成功与否即整个指令的返回值。

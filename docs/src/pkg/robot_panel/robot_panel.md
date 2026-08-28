@@ -30,7 +30,7 @@ control_commander 区块（720×480）内部划分为三个子区：
 
 | 子区 | 位置 (x, y) | 尺寸 (w×h) | 说明 |
 | --- | --- | --- | --- |
-| basic_commander | (0, 0) | 360×288 | 上 60% 左半：veer / wheel / compound 各 mode 按钮（已接入指令下发），底部 speed / duration 输入框 |
+| basic_commander | (0, 0) | 360×288 | 上 60% 左半：veer / wheel / compound / mobile_base 各 mode 按钮（已接入指令下发），底部 param1 / param2 / param3 输入框 |
 | robot_interact | (360, 0) | 360×288 | 上 60% 右半：panorama_info_broadcast（已接入 TTS 播报）/ stereo_distance_broadcast（占位）按钮 |
 | semantic_commander | (0, 288) | 720×192 | 下 40% 整块（当前留空，待后续实现） |
 
@@ -39,25 +39,28 @@ control_commander 区块（720×480）内部划分为三个子区：
 - Veer（4 个）：`home`、`forward`、`turn`、`lift`
 - Wheel（4 个）：`forward`、`turn_right`、`turn_left`、`turn_angle`
 - Compound（5 个）：`home`、`low`、`high`、`rhom_1`、`rhom_2`
+- Mobile Base（1 个）：`dir_m1`（→ `direction_method_1`）
 
 **按钮 → 指令映射**：按钮在后台线程中以 `subprocess.run(['ros2', 'run', 'robot_commander', ...])` 调用对应 commander 测试可执行文件（退出码非 0 时经 ROS 日志告警），指令组合参照已单独验证过的 `scripts/commander_group.py`：
 
 | 按钮（显示名） | 实际下发指令 | 参数来源 |
 | --- | --- | --- |
-| Veer `home` / `forward` / `turn` / `lift` | `veer_commander_test <mode> <duration>` | duration 输入框 |
-| Wheel `forward` | `wheel_commander_test forward <speed> <duration>` | speed + duration 输入框 |
-| Wheel `turn_right`（→ `turn_right_speed`） | `wheel_commander_test turn_right_speed <speed> <duration>` | speed + duration 输入框 |
-| Wheel `turn_left`（→ `turn_left_speed`） | `wheel_commander_test turn_left_speed <speed> <duration>` | speed + duration 输入框 |
-| Wheel `turn_angle` | `wheel_commander_test turn_angle <angle>` | speed 输入框复用为角度（deg）输入 |
-| Compound `home` / `low` / `high` | `compound_commander_test <mode> <duration>` | duration 输入框 |
-| Compound `rhom_1` / `rhom_2`（→ `rhombus_1` / `rhombus_2`） | `compound_commander_test <mode> <duration>` | duration 输入框 |
+| Veer `home` / `forward` / `turn` / `lift` | `veer_commander_test <mode> <duration>` | param2（duration） |
+| Wheel `forward` | `wheel_commander_test forward <speed> <duration>` | param1（speed） + param2（duration） |
+| Wheel `turn_right`（→ `turn_right_speed`） | `wheel_commander_test turn_right_speed <speed> <duration>` | param1（speed） + param2（duration） |
+| Wheel `turn_left`（→ `turn_left_speed`） | `wheel_commander_test turn_left_speed <speed> <duration>` | param1（speed） + param2（duration） |
+| Wheel `turn_angle` | `wheel_commander_test turn_angle <angle>` | param1 复用为角度（deg）输入 |
+| Compound `home` / `low` / `high` | `compound_commander_test <mode> <duration>` | param2（duration） |
+| Compound `rhom_1` / `rhom_2`（→ `rhombus_1` / `rhombus_2`） | `compound_commander_test <mode> <duration>` | param2（duration） |
+| Mobile Base `dir_m1`（→ `direction_method_1`） | `mobile_base_commander_test direction_method_1 <x> <y> <speed>` | param1（x） + param2（y） + param3（speed） |
 
-- 按钮显示名为短名（适应按钮宽度），下发时映射为 commander 实际 mode 名（`turn_right_speed`、`turn_left_speed`、`rhombus_1`、`rhombus_2`）
-- Veer / Compound 仅使用 duration；Wheel 的 `forward` / `turn_right` / `turn_left` 使用 speed + duration
-- `turn_angle` 的角度从 **speed 输入框**读取（该框在 turn_angle 模式下复用为角度输入），时长由角度与转弯半径推导
+- 按钮显示名为短名（适应按钮宽度），下发时映射为 commander 实际 mode 名（`turn_right_speed`、`turn_left_speed`、`rhombus_1`、`rhombus_2`、`direction_method_1`）
+- Veer / Compound 仅使用 param2（duration）；Wheel 的 `forward` / `turn_right` / `turn_left` 使用 param1（speed） + param2（duration）
+- `turn_angle` 的角度从 **param1** 读取（该框在 turn_angle 模式下复用为角度输入），时长由角度与转弯半径推导
+- Mobile Base 的 `direction_method_1` 读取 param1（x）、param2（y）、param3（speed），含义见 [commander.md §5](../robot_commander/commander.md)
 - 输入框数值解析失败（非数字）时不下发指令，仅经 ROS 日志告警
 
-底部输入框：`speed`（默认 0.1 m/s）和 `duration`（默认 3.0 s），供各 mode 使用。
+底部输入框：`param1`（默认 0.1）、`param2`（默认 3.0）、`param3`（默认 0.1），各 mode 按需读取，含义随 mode 变化（见上表）。
 
 **输入框键盘焦点（X11）**：面板为无边框窗口（`overrideredirect`），Tk 的 `focus_force()` 在该场景下只更新 Tk 内部状态、不设置真实 X 输入焦点，导致输入框无法键入。`control_commander.py` 提供模块级 `_x_force_focus()`：点击输入框时经 `ctypes` 直接调用 libX11 的 `XSetInputFocus`（懒加载 `libX11.so.6` 并持有独立 Display 连接）设置真实键盘焦点，同时保留 `focus_force()` 以维持 Tk 内部焦点状态；非 X11 平台加载失败时自动退化为纯 Tk 行为。
 

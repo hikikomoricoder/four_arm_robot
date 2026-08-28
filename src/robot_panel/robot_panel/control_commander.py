@@ -169,8 +169,9 @@ class ControlCommanderBlock(tk.Frame):
     # ------------------------------------------------------------------
     def _build_basic_commander(self, parent):
         """Build the basic_commander section with mode buttons
-        grouped by veer / wheel / compound, plus speed & duration inputs.
-        The speed entry doubles as the turn-angle (deg) input for the
+        grouped by veer / wheel / compound / mobile_base, plus
+        param1 / param2 / param3 inputs (context-dependent).
+        param1 doubles as the turn-angle (deg) input for the
         wheel 'turn_angle' mode.
         """
         bw = HALF_W  # 360
@@ -233,27 +234,39 @@ class ControlCommanderBlock(tk.Frame):
             btn.config(command=lambda m=mode: self._on_compound(m))
         y += BTN_H + ROW_GAP + 4
 
-        # -- Speed & Duration inputs --
+        # -- Mobile Base group --
+        self._group_label(parent, 'Mobile Base:', PAD_X, y)
+        y += LBL_H + 2
+
+        # (button label, mobile_base_commander_test mode)
+        mobile_modes = [('dir_m1', 'direction_method_1')]
+        n = len(mobile_modes)
+        btn_w = (usable - (n - 1) * ROW_GAP) // n
+        for i, (label, mode) in enumerate(mobile_modes):
+            bx = PAD_X + i * (btn_w + ROW_GAP)
+            btn = self._make_btn(parent, label, bx, y, btn_w)
+            btn.config(command=lambda m=mode: self._on_mobile_base(m))
+        y += BTN_H + ROW_GAP + 4
+
+        # -- Parameter inputs (context-dependent) --
         field_y = y
-        tk.Label(parent, text='speed:', bg=self._bg, fg=self._fg,
+        tk.Label(parent, text='param1:', bg=self._bg, fg=self._fg,
                  font=('TkDefaultFont', 9), anchor='e').place(
             x=PAD_X, y=field_y, width=48, height=BTN_H)
-        self._speed_entry = self._make_entry(
-            parent, PAD_X + 52, field_y, 72, default='0.1')
+        self._param1_entry = self._make_entry(
+            parent, PAD_X + 52, field_y, 56, default='0.1')
 
-        tk.Label(parent, text='m/s', bg=self._bg, fg=self._fg,
-                 font=('TkDefaultFont', 8), anchor='w').place(
-            x=PAD_X + 52 + 74, y=field_y, width=24, height=BTN_H)
-
-        tk.Label(parent, text='duration:', bg=self._bg, fg=self._fg,
+        tk.Label(parent, text='param2:', bg=self._bg, fg=self._fg,
                  font=('TkDefaultFont', 9), anchor='e').place(
-            x=PAD_X + 160, y=field_y, width=56, height=BTN_H)
-        self._duration_entry = self._make_entry(
-            parent, PAD_X + 220, field_y, 72, default='3.0')
+            x=PAD_X + 120, y=field_y, width=48, height=BTN_H)
+        self._param2_entry = self._make_entry(
+            parent, PAD_X + 172, field_y, 56, default='3.0')
 
-        tk.Label(parent, text='s', bg=self._bg, fg=self._fg,
-                 font=('TkDefaultFont', 8), anchor='w').place(
-            x=PAD_X + 220 + 74, y=field_y, width=16, height=BTN_H)
+        tk.Label(parent, text='param3:', bg=self._bg, fg=self._fg,
+                 font=('TkDefaultFont', 9), anchor='e').place(
+            x=PAD_X + 240, y=field_y, width=48, height=BTN_H)
+        self._param3_entry = self._make_entry(
+            parent, PAD_X + 292, field_y, 56, default='0.1')
 
     # ------------------------------------------------------------------
     # robot_interact (top-right)
@@ -301,9 +314,9 @@ class ControlCommanderBlock(tk.Frame):
     # ------------------------------------------------------------------
     def _on_wheel_turn_angle(self):
         """Run wheel_commander_test turn_angle; the angle (deg) is read
-        from the speed entry, which is reused as the turn-angle input.
+        from param1, which is reused as the turn-angle input.
         Runs in a background thread so the UI stays responsive."""
-        raw = self._speed_entry.get().strip()
+        raw = self._param1_entry.get().strip()
         try:
             angle = float(raw)
         except ValueError:
@@ -359,7 +372,7 @@ class ControlCommanderBlock(tk.Frame):
     def _on_veer(self, mode):
         """Run veer_commander_test <mode> <duration>."""
         duration = self._read_float(
-            self._duration_entry, f'veer {mode} duration')
+            self._param2_entry, f'veer {mode} duration')
         if duration is None:
             return
         self._run_commander(
@@ -369,9 +382,9 @@ class ControlCommanderBlock(tk.Frame):
 
     def _on_wheel(self, mode):
         """Run wheel_commander_test <mode> <speed> <duration>."""
-        speed = self._read_float(self._speed_entry, f'wheel {mode} speed')
+        speed = self._read_float(self._param1_entry, f'wheel {mode} speed')
         duration = self._read_float(
-            self._duration_entry, f'wheel {mode} duration')
+            self._param2_entry, f'wheel {mode} duration')
         if speed is None or duration is None:
             return
         self._run_commander(
@@ -382,13 +395,30 @@ class ControlCommanderBlock(tk.Frame):
     def _on_compound(self, mode):
         """Run compound_commander_test <mode> <duration>."""
         duration = self._read_float(
-            self._duration_entry, f'compound {mode} duration')
+            self._param2_entry, f'compound {mode} duration')
         if duration is None:
             return
         self._run_commander(
             ['ros2', 'run', 'robot_commander', 'compound_commander_test',
              mode, str(duration)],
             f'compound {mode}')
+
+    def _on_mobile_base(self, mode):
+        """Run mobile_base_commander_test <mode> <param1> <param2> <param3>."""
+        if mode == 'direction_method_1':
+            param1 = self._read_float(
+                self._param1_entry, f'mobile_base {mode} param1')
+            param2 = self._read_float(
+                self._param2_entry, f'mobile_base {mode} param2')
+            param3 = self._read_float(
+                self._param3_entry, f'mobile_base {mode} param3')
+            if param1 is None or param2 is None or param3 is None:
+                return
+            self._run_commander(
+                ['ros2', 'run', 'robot_commander',
+                 'mobile_base_commander_test',
+                 mode, str(param1), str(param2), str(param3)],
+                f'mobile_base {mode}')
 
     def _on_panorama_broadcast(self):
         """Speak the latest panorama azimuth description once via TTS."""
