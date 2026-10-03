@@ -1,5 +1,7 @@
 # Four Arm Robot 项目文档
 
+https://hikikomoricoder.github.io/four_arm_robot/#/
+
 四臂机器人（four_arm_robot）是一个组合式的跨地形机器人项目：四个四自由度机械臂串联，通过控制关节电机变形实现跨地形运动，末端分支操控物体；每个机械臂底座采用舵轮控制平面运动，搭载 6 相机（4 路全景拼接 + 2 路双目测距）。
 
 技术栈：C++ / Python 混合编程、ROS 2 Jazzy、Gazebo 仿真、传统图像处理、3D 视觉、目标检测/分割/追踪、ONNX/TRT/RKNN/NCNN 模型转换部署。
