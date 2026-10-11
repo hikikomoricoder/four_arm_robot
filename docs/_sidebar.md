@@ -9,7 +9,7 @@
   - [extend 说明](extend/readme.md)
   - [MOSS-TTS-Nano 扩展](extend/mos_tts_nano/moss_tts_nano_extend.md)
   - [service_manager 服务管理](extend/seperated_service/service_manager.md)
-  - [YOLO11s 知识蒸馏方案](extend/ultralytics/distillation.md)
+  - [YOLO11s 蒸馏+微调](extend/ultralytics/distillation.md)
 
 - 源码模块文档
   - [四相机水平拼接实现流程](src/pkg/panorama_camera/concat_process.md)
